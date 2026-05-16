@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhantomWall Setup</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <div class="grid-overlay"></div>
+    <main class="options-shell">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">Hosted deployment setup</p>
+          <h1>Connect this install</h1>
+          <p class="hero-copy">
+            Register this browser with your PhantomWall backend so blocked tracker
+            telemetry can stream into your shared dashboard.
+          </p>
+        </div>
+        <div class="hero-status">
+          <span id="health-pill" class="status-pill offline">Not connected</span>
+          <p id="status-copy" class="status-footnote">Waiting for configuration</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <form id="setup-form" class="setup-form">
+          <label>
+            <span>Backend URL</span>
+            <input id="backend-endpoint" type="url" placeholder="https://api.phantomwall.app" required />
+          </label>
+          <label>
+            <span>Install name</span>
+            <input id="display-name" type="text" placeholder="Tanmay Laptop" required />
+          </label>
+          <label>
+            <span>Invite code</span>
+            <input id="invite-code" type="text" placeholder="Provided by your admin" required />
+          </label>
+          <div class="button-row">
+            <button type="submit" class="action-button">Save settings</button>
+            <button id="register-button" type="button" class="action-button secondary">
+              Register install
+            </button>
+          </div>
+        </form>
+        <p id="form-feedback" class="feedback-text"></p>
+      </section>
+
+      <section class="panel info-grid">
+        <article class="info-card">
+          <p class="info-label">Install ID</p>
+          <h3 id="install-id">Not registered</h3>
+        </article>
+        <article class="info-card">
+          <p class="info-label">Registered at</p>
+          <h3 id="registered-at">Pending</h3>
+        </article>
+        <article class="info-card">
+          <p class="info-label">Extension version</p>
+          <h3 id="extension-version">1.0.0</h3>
+        </article>
+      </section>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>
+

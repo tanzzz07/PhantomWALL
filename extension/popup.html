@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhantomWall</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">Distributed privacy defense</p>
+          <h1>PhantomWall</h1>
+        </div>
+        <span id="protection-pill" class="status-pill online">Shield active</span>
+      </section>
+
+      <section class="card-grid">
+        <article class="metric-card">
+          <p class="metric-label">Blocked trackers</p>
+          <h2 id="blocked-count">0</h2>
+          <p id="last-updated" class="metric-footnote">Awaiting telemetry</p>
+        </article>
+
+        <article class="metric-card">
+          <p class="metric-label">Backend sync</p>
+          <h2 id="backend-status">Offline</h2>
+          <p id="stream-status" class="metric-footnote">Live stream idle</p>
+        </article>
+      </section>
+
+      <section class="analytics-card">
+        <div class="section-header">
+          <h3>Top tracker domains</h3>
+          <span id="rules-status" class="inline-status">Ruleset loading</span>
+        </div>
+        <ul id="top-domains" class="tracker-list">
+          <li class="empty-state">No blocked trackers yet</li>
+        </ul>
+      </section>
+
+      <section class="analytics-card controls-card">
+        <div class="section-header">
+          <h3>Deployment</h3>
+          <span id="registration-status" class="inline-status">Setup needed</span>
+        </div>
+        <p id="install-meta" class="metric-footnote">
+          Connect this install to your hosted PhantomWall backend.
+        </p>
+        <div class="button-row">
+          <button id="setup-button" class="action-button" type="button">Manage setup</button>
+          <button id="dashboard-button" class="action-button secondary" type="button">
+            Open dashboard
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

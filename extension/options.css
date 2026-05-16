@@ -1,0 +1,198 @@
+:root {
+  color-scheme: dark;
+  --bg: #07111f;
+  --panel: rgba(8, 22, 39, 0.92);
+  --panel-border: rgba(84, 214, 255, 0.16);
+  --text: #f2f8ff;
+  --muted: #89a7c7;
+  --accent: #00d1ff;
+  --success: #2affb4;
+  --danger: #ff5e7a;
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(0, 209, 255, 0.22), transparent 34%),
+    radial-gradient(circle at bottom right, rgba(42, 255, 180, 0.16), transparent 24%),
+    linear-gradient(160deg, #020812 0%, #07111f 46%, #030916 100%);
+}
+
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent);
+}
+
+.options-shell {
+  position: relative;
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 28px 0 48px;
+  display: grid;
+  gap: 18px;
+}
+
+.hero-panel,
+.panel,
+.info-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+.hero-panel,
+.panel {
+  padding: 24px;
+}
+
+.hero-panel {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.eyebrow,
+.info-label,
+.setup-form span {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  margin-top: 10px;
+  font-size: clamp(30px, 5vw, 48px);
+}
+
+.hero-copy,
+.status-footnote,
+.feedback-text {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.hero-copy {
+  margin-top: 14px;
+  max-width: 620px;
+}
+
+.hero-status {
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+  align-content: start;
+}
+
+.status-pill {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status-pill.online {
+  color: var(--accent);
+  background: rgba(0, 209, 255, 0.14);
+}
+
+.status-pill.offline {
+  color: var(--danger);
+  background: rgba(255, 94, 122, 0.14);
+}
+
+.setup-form {
+  display: grid;
+  gap: 16px;
+}
+
+.setup-form label {
+  display: grid;
+  gap: 8px;
+}
+
+.setup-form input {
+  width: 100%;
+  border: 1px solid rgba(137, 167, 199, 0.18);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: rgba(3, 12, 22, 0.82);
+  color: var(--text);
+  font: inherit;
+}
+
+.button-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.action-button {
+  border: 0;
+  border-radius: 14px;
+  padding: 14px 18px;
+  background: linear-gradient(90deg, var(--accent), var(--success));
+  color: #021118;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.action-button.secondary {
+  color: var(--text);
+  background: rgba(137, 167, 199, 0.16);
+  border: 1px solid rgba(137, 167, 199, 0.2);
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.info-card {
+  padding: 20px;
+}
+
+.info-card h3 {
+  margin-top: 12px;
+  font-size: 20px;
+}
+
+@media (max-width: 780px) {
+  .hero-panel {
+    flex-direction: column;
+  }
+
+  .hero-status {
+    justify-items: start;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}

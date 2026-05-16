@@ -1,0 +1,42 @@
+services:
+  phantomwall-postgres:
+    image: postgres:16-alpine
+    container_name: phantomwall-postgres
+    environment:
+      POSTGRES_DB: phantomwall
+      POSTGRES_USER: phantomwall
+      POSTGRES_PASSWORD: tanmay123
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phantomwall -d phantomwall"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - phantomwall-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  phantomwall-backend:
+    build:
+      context: ./backend
+    container_name: phantomwall-backend
+    depends_on:
+      phantomwall-postgres:
+        condition: service_healthy
+    environment:
+      PHANTOMWALL_APP_ENV: production
+      PHANTOMWALL_DATABASE_URL: postgresql+asyncpg://phantomwall:phantomwall@phantomwall-postgres:5432/phantomwall
+      PHANTOMWALL_CORS_ORIGINS: http://localhost,http://127.0.0.1
+      PHANTOMWALL_CORS_ORIGIN_REGEX: chrome-extension://.*
+      PHANTOMWALL_PUBLIC_BACKEND_URL: http://localhost:8000
+      PHANTOMWALL_ADMIN_USERNAME: admin
+      PHANTOMWALL_ADMIN_PASSWORD: tanmay@E31
+      PHANTOMWALL_JWT_SECRET_KEY: change-this-jwt-secret
+      PHANTOMWALL_REGISTRATION_INVITE_CODE: phantomwall-invite
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  phantomwall-postgres-data:
