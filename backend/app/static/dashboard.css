@@ -511,3 +511,8 @@ h1 {
   box-shadow: 0 0 16px rgba(0, 211, 255, 0.3);
 }
 
+[hidden] {
+  display: none !important;
+}
+
+
