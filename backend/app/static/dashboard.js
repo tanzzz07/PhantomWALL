@@ -21,6 +21,7 @@ const elements = {
   uniqueTrackers: document.getElementById("unique-trackers"),
   blockRate: document.getElementById("block-rate"),
   topTrackers: document.getElementById("top-trackers"),
+  classificationBreakdown: document.getElementById("classification-breakdown"),
   requestTypes: document.getElementById("request-types"),
   serviceStatus: document.getElementById("service-status"),
   thirdPartyCount: document.getElementById("third-party-count"),
@@ -128,6 +129,9 @@ function renderDashboard(stats) {
   const requestBreakdown = Array.isArray(stats.request_type_breakdown)
     ? stats.request_type_breakdown
     : [];
+  const classificationBreakdown = Array.isArray(stats.classification_breakdown)
+    ? stats.classification_breakdown
+    : [];
   const blockedCount = Number(stats.blocked_tracker_count || 0);
   const totalEvents = Number(stats.total_events || 0);
   const blockRate = totalEvents > 0
@@ -155,6 +159,15 @@ function renderDashboard(stats) {
       value: entry.count,
     })),
     "No tracker activity yet"
+  );
+
+  renderBars(
+    elements.classificationBreakdown,
+    classificationBreakdown.map((entry) => ({
+      label: entry.domain,
+      value: entry.count,
+    })),
+    "Waiting for classification telemetry"
   );
 
   renderBars(
@@ -251,7 +264,7 @@ function renderRecentEvents(events) {
   if (!events.length) {
     elements.recentEvents.innerHTML = `
       <tr>
-        <td colspan="6" class="empty-cell">No events received yet</td>
+        <td colspan="7" class="empty-cell">No events received yet</td>
       </tr>
     `;
     return;
@@ -265,6 +278,11 @@ function renderRecentEvents(events) {
       <td class="tracker-cell">${escapeHtml(event.tracker_domain)}</td>
       <td>${escapeHtml(event.request_type || "unknown")}</td>
       <td>${escapeHtml(formatOrigin(event.page_origin))}</td>
+      <td>
+        <span class="category-pill ${(event.classification || "Safe").toLowerCase()}">
+          ${escapeHtml(event.classification || "Safe")}
+        </span>
+      </td>
       <td>
         <span class="decision-pill ${event.blocked ? "blocked" : "observed"}">
           ${event.blocked ? "Blocked" : "Observed"}

@@ -104,6 +104,16 @@
 
         <article class="panel">
           <div class="panel-header">
+            <h3>Threat Classification</h3>
+            <span class="panel-tag">ML-based categorization</span>
+          </div>
+          <div id="classification-breakdown" class="bars-list">
+            <p class="empty-state">Waiting for classification telemetry</p>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
             <h3>Traffic Shape</h3>
             <span class="panel-tag">Request type mix</span>
           </div>
@@ -153,12 +163,13 @@
                   <th>Tracker</th>
                   <th>Type</th>
                   <th>Origin</th>
+                  <th>Category</th>
                   <th>Decision</th>
                 </tr>
               </thead>
               <tbody id="recent-events">
                 <tr>
-                  <td colspan="6" class="empty-cell">No events received yet</td>
+                  <td colspan="7" class="empty-cell">No events received yet</td>
                 </tr>
               </tbody>
             </table>

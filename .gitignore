@@ -48,3 +48,4 @@ build/
 
 # Chrome extension temp files
 *.pem
+extension/_metadata/

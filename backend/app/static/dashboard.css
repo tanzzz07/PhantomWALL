@@ -231,7 +231,7 @@ h1 {
 }
 
 .content-grid {
-  grid-template-columns: 1.15fr 0.85fr;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   margin-top: 18px;
 }
 
@@ -382,6 +382,47 @@ h1 {
 .decision-pill.observed {
   color: var(--warning);
   background: rgba(255, 201, 91, 0.12);
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 11px;
+  border-radius: 999px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.category-pill.fingerprinting {
+  color: var(--warning);
+  background: rgba(255, 201, 91, 0.12);
+  border: 1px solid rgba(255, 201, 91, 0.22);
+}
+
+.category-pill.advertising {
+  color: var(--danger);
+  background: rgba(255, 99, 126, 0.12);
+  border: 1px solid rgba(255, 99, 126, 0.22);
+}
+
+.category-pill.analytics {
+  color: var(--accent);
+  background: rgba(0, 211, 255, 0.12);
+  border: 1px solid rgba(0, 211, 255, 0.22);
+}
+
+.category-pill.tracker {
+  color: #c98eff;
+  background: rgba(201, 142, 255, 0.12);
+  border: 1px solid rgba(201, 142, 255, 0.22);
+}
+
+.category-pill.safe {
+  color: var(--accent-2);
+  background: rgba(42, 255, 180, 0.12);
+  border: 1px solid rgba(42, 255, 180, 0.22);
 }
 
 @media (max-width: 1080px) {

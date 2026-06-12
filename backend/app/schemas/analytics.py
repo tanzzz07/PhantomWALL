@@ -32,6 +32,7 @@ class TrackerEvent(BaseModel):
     source: str
     blocked: bool
     third_party: bool
+    classification: str | None = "Safe"
     occurred_at: datetime
 
 
@@ -42,6 +43,7 @@ class StatsResponse(BaseModel):
     unique_install_count: int
     top_tracker_domains: list[DomainCount]
     request_type_breakdown: list[DomainCount]
+    classification_breakdown: list[DomainCount]
     installs: list["InstallTraffic"]
     recent_events: list[TrackerEvent]
     service_status: str

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import Integer, Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from app.schemas.analytics import (
     TrackerEvent,
     TrackEventIn,
 )
+from app.services.classifier import TrackerClassifier
 
 
 class AnalyticsService:
@@ -26,6 +27,23 @@ class AnalyticsService:
         install: Install,
         event: TrackEventIn,
     ) -> StatsResponse:
+        # Get count of events for this install and domain in the last 5 minutes (request frequency)
+        time_limit = datetime.now(timezone.utc) - timedelta(minutes=5)
+        count_query = select(func.count(TrackerEventRecord.id)).where(
+            TrackerEventRecord.install_id == install.id,
+            TrackerEventRecord.tracker_domain == event.tracker_domain,
+            TrackerEventRecord.occurred_at >= time_limit
+        )
+        recent_count = await self._scalar_count(session, count_query)
+
+        # Classify the threat level of the event
+        classification = TrackerClassifier.classify(
+            domain=event.tracker_domain,
+            url=event.url,
+            recent_count=recent_count,
+            is_third_party=event.third_party,
+        )
+
         record = TrackerEventRecord(
             install_id=install.id,
             tracker_domain=event.tracker_domain,
@@ -35,6 +53,7 @@ class AnalyticsService:
             source=event.source,
             blocked=event.blocked,
             third_party=event.third_party,
+            classification=classification,
             occurred_at=event.occurred_at,
         )
         install.last_seen_at = datetime.now(timezone.utc)
@@ -79,6 +98,7 @@ class AnalyticsService:
 
         top_tracker_domains = await self._top_domains(session, base_filters)
         request_type_breakdown = await self._request_type_breakdown(session, base_filters)
+        classification_breakdown = await self._classification_breakdown(session, base_filters)
         installs = await self._install_breakdown(session, install_id)
         recent_events = await self._recent_events(
             session,
@@ -93,6 +113,7 @@ class AnalyticsService:
             unique_install_count=unique_install_count,
             top_tracker_domains=top_tracker_domains,
             request_type_breakdown=request_type_breakdown,
+            classification_breakdown=classification_breakdown,
             installs=installs,
             recent_events=recent_events,
             service_status="online",
@@ -217,6 +238,27 @@ class AnalyticsService:
             for install_id, display_name, event_count, blocked_count, last_seen_at in result.all()
         ]
 
+    async def _classification_breakdown(
+        self,
+        session: AsyncSession,
+        filters: list,
+    ) -> list[DomainCount]:
+        classification_expr = func.coalesce(TrackerEventRecord.classification, "Safe")
+        result = await session.execute(
+            select(
+                classification_expr.label("classification"),
+                func.count(TrackerEventRecord.id).label("count"),
+            )
+            .where(*filters)
+            .group_by(classification_expr)
+            .order_by(func.count(TrackerEventRecord.id).desc())
+            .limit(5)
+        )
+        return [
+            DomainCount(domain=classification, count=count)
+            for classification, count in result.all()
+        ]
+
     async def _recent_events(
         self,
         session: AsyncSession,
@@ -243,6 +285,7 @@ class AnalyticsService:
                 source=record.source,
                 blocked=record.blocked,
                 third_party=record.third_party,
+                classification=record.classification or "Safe",
                 occurred_at=record.occurred_at,
             )
             for record in records

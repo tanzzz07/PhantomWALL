@@ -54,6 +54,7 @@ class TrackerEventRecord(Base):
     source: Mapped[str] = mapped_column(String(64), nullable=False, default="extension")
     blocked: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     third_party: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    classification: Mapped[str | None] = mapped_column(String(64), nullable=True)
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
