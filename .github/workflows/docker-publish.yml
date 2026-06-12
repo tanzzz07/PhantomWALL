@@ -121,7 +121,23 @@ jobs:
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions"
 
-          git clone https://x-access-token:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME hf_space
+          # Clone with retry logic to handle rate-limiting (HTTP 429) from Hugging Face Hub
+          CLONED=false
+          for i in {1..5}; do
+            echo "Attempt $i to clone Hugging Face Space..."
+            if git clone https://x-access-token:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME hf_space; then
+              CLONED=true
+              break
+            else
+              echo "Clone failed. Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+
+          if [ "$CLONED" = "false" ]; then
+            echo "Error: Failed to clone Hugging Face Space after 5 attempts."
+            exit 1
+          fi
 
           # Clear out existing files in space repository clone except for .git folder
           find hf_space -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
