@@ -9,7 +9,7 @@ from app.core.dependencies import (
 )
 from app.db import get_db_session
 from app.models import Install
-from app.schemas.analytics import StatsResponse, TrackEventIn, TrackEventResponse
+from app.schemas.analytics import BlockedScriptRecord, StatsResponse, TrackEventIn, TrackEventResponse
 from app.services.analytics import AnalyticsService
 from app.services.websocket_manager import WebSocketManager
 
@@ -51,8 +51,28 @@ async def get_stats(
     analytics_service: AnalyticsService = Depends(get_analytics_service),
     session: AsyncSession = Depends(get_db_session),
 ) -> StatsResponse:
+    user_id = _admin.get("user_id") if _admin.get("scope") == "user" else None
     return await analytics_service.get_stats(
         session=session,
+        user_id=user_id,
         install_id=install_id,
         recent_limit=recent_limit,
     )
+
+
+@router.get("/blocked-scripts", response_model=list[BlockedScriptRecord])
+async def get_blocked_scripts(
+    install_id: str | None = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    _admin: dict = Depends(require_admin),
+    analytics_service: AnalyticsService = Depends(get_analytics_service),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[BlockedScriptRecord]:
+    user_id = _admin.get("user_id") if _admin.get("scope") == "user" else None
+    return await analytics_service.get_blocked_scripts(
+        session=session,
+        user_id=user_id,
+        install_id=install_id,
+        limit=limit,
+    )
+

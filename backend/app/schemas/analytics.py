@@ -66,3 +66,12 @@ class InstallTraffic(BaseModel):
 
 StatsResponse.model_rebuild()
 
+
+class BlockedScriptRecord(BaseModel):
+    occurred_at: datetime
+    page_origin: str | None
+    url: str
+    classification: str | None
+    install_name: str | None
+
+

@@ -4,8 +4,9 @@ from sqlalchemy import Integer, Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Install, TrackerEventRecord
+from app.models import Install, TrackerEventRecord, User
 from app.schemas.analytics import (
+    BlockedScriptRecord,
     DomainCount,
     InstallTraffic,
     StatsResponse,
@@ -64,6 +65,7 @@ class AnalyticsService:
     async def get_stats(
         self,
         session: AsyncSession,
+        user_id: str | None = None,
         install_id: str | None = None,
         recent_limit: int | None = None,
     ) -> StatsResponse:
@@ -71,39 +73,42 @@ class AnalyticsService:
         if install_id:
             base_filters.append(TrackerEventRecord.install_id == install_id)
 
-        total_events = await self._scalar_count(
-            session,
-            select(func.count(TrackerEventRecord.id)).where(*base_filters),
-        )
-        blocked_tracker_count = await self._scalar_count(
-            session,
-            select(func.count(TrackerEventRecord.id)).where(
-                *base_filters,
-                TrackerEventRecord.blocked.is_(True),
-            ),
-        )
-        unique_tracker_count = await self._scalar_count(
-            session,
-            select(func.count(func.distinct(TrackerEventRecord.tracker_domain))).where(
-                *base_filters
-            ),
-        )
+        q_total = select(func.count(TrackerEventRecord.id)).where(*base_filters)
+        if user_id:
+            q_total = q_total.join(Install).where(Install.user_id == user_id)
+        total_events = await self._scalar_count(session, q_total)
 
-        unique_install_count = await self._scalar_count(
-            session,
-            select(func.count(func.distinct(TrackerEventRecord.install_id))).where(
-                *base_filters
-            ),
+        q_blocked = select(func.count(TrackerEventRecord.id)).where(
+            *base_filters,
+            TrackerEventRecord.blocked.is_(True),
         )
+        if user_id:
+            q_blocked = q_blocked.join(Install).where(Install.user_id == user_id)
+        blocked_tracker_count = await self._scalar_count(session, q_blocked)
 
-        top_tracker_domains = await self._top_domains(session, base_filters)
-        request_type_breakdown = await self._request_type_breakdown(session, base_filters)
-        classification_breakdown = await self._classification_breakdown(session, base_filters)
-        installs = await self._install_breakdown(session, install_id)
+        q_unique = select(func.count(func.distinct(TrackerEventRecord.tracker_domain))).where(
+            *base_filters
+        )
+        if user_id:
+            q_unique = q_unique.join(Install).where(Install.user_id == user_id)
+        unique_tracker_count = await self._scalar_count(session, q_unique)
+
+        q_install = select(func.count(func.distinct(TrackerEventRecord.install_id))).where(
+            *base_filters
+        )
+        if user_id:
+            q_install = q_install.join(Install).where(Install.user_id == user_id)
+        unique_install_count = await self._scalar_count(session, q_install)
+
+        top_tracker_domains = await self._top_domains(session, base_filters, user_id)
+        request_type_breakdown = await self._request_type_breakdown(session, base_filters, user_id)
+        classification_breakdown = await self._classification_breakdown(session, base_filters, user_id)
+        installs = await self._install_breakdown(session, user_id, install_id)
         recent_events = await self._recent_events(
             session,
             base_filters,
             recent_limit or self._max_recent_events,
+            user_id,
         )
 
         return StatsResponse(
@@ -121,8 +126,8 @@ class AnalyticsService:
             selected_install_id=install_id,
         )
 
-    async def list_installs(self, session: AsyncSession) -> list[InstallTraffic]:
-        return await self._install_breakdown(session=session, selected_install_id=None)
+    async def list_installs(self, session: AsyncSession, user_id: str | None = None) -> list[InstallTraffic]:
+        return await self._install_breakdown(session=session, user_id=user_id, selected_install_id=None)
 
     async def get_install_by_token(
         self,
@@ -146,6 +151,7 @@ class AnalyticsService:
         extension_version: str | None,
         browser_name: str | None,
         notes: str | None,
+        user_id: str | None = None,
     ) -> Install:
         install = Install(
             display_name=display_name,
@@ -154,56 +160,20 @@ class AnalyticsService:
             browser_name=browser_name,
             notes=notes,
             last_seen_at=datetime.now(timezone.utc),
+            user_id=user_id,
         )
         session.add(install)
         await session.commit()
         await session.refresh(install)
         return install
 
-    async def _top_domains(
-        self,
-        session: AsyncSession,
-        filters: list,
-    ) -> list[DomainCount]:
-        result = await session.execute(
-            select(
-                TrackerEventRecord.tracker_domain,
-                func.count(TrackerEventRecord.id).label("count"),
-            )
-            .where(*filters)
-            .group_by(TrackerEventRecord.tracker_domain)
-            .order_by(func.count(TrackerEventRecord.id).desc())
-            .limit(5)
-        )
-        return [
-            DomainCount(domain=domain, count=count)
-            for domain, count in result.all()
-        ]
 
-    async def _request_type_breakdown(
-        self,
-        session: AsyncSession,
-        filters: list,
-    ) -> list[DomainCount]:
-        request_type_expr = func.coalesce(TrackerEventRecord.request_type, "unknown")
-        result = await session.execute(
-            select(
-                request_type_expr.label("request_type"),
-                func.count(TrackerEventRecord.id).label("count"),
-            )
-            .where(*filters)
-            .group_by(request_type_expr)
-            .order_by(func.count(TrackerEventRecord.id).desc())
-            .limit(6)
-        )
-        return [
-            DomainCount(domain=request_type, count=count)
-            for request_type, count in result.all()
-        ]
+
 
     async def _install_breakdown(
         self,
         session: AsyncSession,
+        user_id: str | None,
         selected_install_id: str | None,
     ) -> list[InstallTraffic]:
         event_count = func.count(TrackerEventRecord.id)
@@ -223,8 +193,11 @@ class AnalyticsService:
             .group_by(Install.id, Install.display_name, Install.last_seen_at)
             .order_by(func.coalesce(event_count, 0).desc(), Install.created_at.asc())
         )
+        if user_id:
+            query = query.where(Install.user_id == user_id)
         if selected_install_id:
             query = query.where(Install.id == selected_install_id)
+
 
         result = await session.execute(query)
         return [
@@ -237,23 +210,69 @@ class AnalyticsService:
             )
             for install_id, display_name, event_count, blocked_count, last_seen_at in result.all()
         ]
+    async def _top_domains(
+        self,
+        session: AsyncSession,
+        filters: list,
+        user_id: str | None = None,
+    ) -> list[DomainCount]:
+        query = select(
+            TrackerEventRecord.tracker_domain,
+            func.count(TrackerEventRecord.id).label("count"),
+        ).where(*filters)
+        if user_id:
+            query = query.join(Install).where(Install.user_id == user_id)
+        query = query.group_by(TrackerEventRecord.tracker_domain).order_by(
+            func.count(TrackerEventRecord.id).desc()
+        ).limit(5)
+
+        result = await session.execute(query)
+        return [
+            DomainCount(domain=domain, count=count)
+            for domain, count in result.all()
+        ]
+
+    async def _request_type_breakdown(
+        self,
+        session: AsyncSession,
+        filters: list,
+        user_id: str | None = None,
+    ) -> list[DomainCount]:
+        request_type_expr = func.coalesce(TrackerEventRecord.request_type, "unknown")
+        query = select(
+            request_type_expr.label("request_type"),
+            func.count(TrackerEventRecord.id).label("count"),
+        ).where(*filters)
+        if user_id:
+            query = query.join(Install).where(Install.user_id == user_id)
+        query = query.group_by(request_type_expr).order_by(
+            func.count(TrackerEventRecord.id).desc()
+        ).limit(6)
+
+        result = await session.execute(query)
+        return [
+            DomainCount(domain=request_type, count=count)
+            for request_type, count in result.all()
+        ]
 
     async def _classification_breakdown(
         self,
         session: AsyncSession,
         filters: list,
+        user_id: str | None = None,
     ) -> list[DomainCount]:
         classification_expr = func.coalesce(TrackerEventRecord.classification, "Safe")
-        result = await session.execute(
-            select(
-                classification_expr.label("classification"),
-                func.count(TrackerEventRecord.id).label("count"),
-            )
-            .where(*filters)
-            .group_by(classification_expr)
-            .order_by(func.count(TrackerEventRecord.id).desc())
-            .limit(5)
-        )
+        query = select(
+            classification_expr.label("classification"),
+            func.count(TrackerEventRecord.id).label("count"),
+        ).where(*filters)
+        if user_id:
+            query = query.join(Install).where(Install.user_id == user_id)
+        query = query.group_by(classification_expr).order_by(
+            func.count(TrackerEventRecord.id).desc()
+        ).limit(5)
+
+        result = await session.execute(query)
         return [
             DomainCount(domain=classification, count=count)
             for classification, count in result.all()
@@ -264,14 +283,18 @@ class AnalyticsService:
         session: AsyncSession,
         filters: list,
         limit: int,
+        user_id: str | None = None,
     ) -> list[TrackerEvent]:
-        result = await session.execute(
-            select(TrackerEventRecord)
-            .options(selectinload(TrackerEventRecord.install))
-            .where(*filters)
-            .order_by(TrackerEventRecord.occurred_at.desc(), TrackerEventRecord.id.desc())
-            .limit(limit)
-        )
+        query = select(TrackerEventRecord).options(
+            selectinload(TrackerEventRecord.install)
+        ).where(*filters)
+        if user_id:
+            query = query.join(Install).where(Install.user_id == user_id)
+        query = query.order_by(
+            TrackerEventRecord.occurred_at.desc(), TrackerEventRecord.id.desc()
+        ).limit(limit)
+
+        result = await session.execute(query)
         records = result.scalars().all()
         return [
             TrackerEvent(
@@ -287,6 +310,40 @@ class AnalyticsService:
                 third_party=record.third_party,
                 classification=record.classification or "Safe",
                 occurred_at=record.occurred_at,
+            )
+            for record in records
+        ]
+
+    async def get_blocked_scripts(
+        self,
+        session: AsyncSession,
+        user_id: str | None = None,
+        install_id: str | None = None,
+        limit: int = 50,
+    ) -> list[BlockedScriptRecord]:
+        query = select(TrackerEventRecord).options(
+            selectinload(TrackerEventRecord.install)
+        ).where(
+            TrackerEventRecord.request_type == "script",
+            TrackerEventRecord.blocked.is_(True),
+        )
+        if install_id:
+            query = query.where(TrackerEventRecord.install_id == install_id)
+        if user_id:
+            query = query.join(Install).where(Install.user_id == user_id)
+        query = query.order_by(
+            TrackerEventRecord.occurred_at.desc(), TrackerEventRecord.id.desc()
+        ).limit(limit)
+
+        result = await session.execute(query)
+        records = result.scalars().all()
+        return [
+            BlockedScriptRecord(
+                occurred_at=record.occurred_at,
+                page_origin=record.page_origin,
+                url=record.url,
+                classification=record.classification or "Safe",
+                install_name=record.install.display_name if record.install else "Unknown",
             )
             for record in records
         ]

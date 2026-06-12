@@ -11,23 +11,26 @@
 
     <section id="auth-panel" class="auth-panel">
       <div class="auth-card">
-        <p class="eyebrow">Admin access</p>
-        <h1>PhantomWall Command</h1>
-        <p class="hero-copy">
+        <p id="auth-eyebrow" class="eyebrow">Admin access</p>
+        <h1 id="auth-title">PhantomWall Command</h1>
+        <p id="auth-desc" class="hero-copy">
           Sign in to review all registered installs, live blocked tracker events,
           and shared telemetry across your deployed extension fleet.
         </p>
         <form id="login-form" class="auth-form">
           <label>
             <span>Username</span>
-            <input id="username" type="text" value="admin" autocomplete="username" required />
+            <input id="username" type="text" autocomplete="username" required />
           </label>
           <label>
             <span>Password</span>
             <input id="password" type="password" autocomplete="current-password" required />
           </label>
-          <button type="submit" class="primary-button">Enter dashboard</button>
+          <button id="auth-submit-btn" type="submit" class="primary-button">Enter dashboard</button>
           <p id="login-error" class="error-text"></p>
+          <p class="auth-toggle-wrap" style="text-align: center; margin-top: 10px; font-size: 13px;">
+            <span id="toggle-text-prefix">Don't have an account?</span> <a href="#" id="toggle-auth-mode" style="color: var(--accent); text-decoration: none; font-weight: bold;">Register</a>
+          </p>
         </form>
       </div>
     </section>
@@ -43,10 +46,16 @@
           </p>
         </div>
         <div class="hero-status">
+          <button id="logout-btn" class="status-pill logout-btn">Logout</button>
           <span id="backend-pill" class="status-pill online">Backend online</span>
           <span id="socket-pill" class="status-pill idle">Live stream idle</span>
           <p id="generated-at" class="status-footnote">Waiting for first snapshot</p>
         </div>
+      </section>
+
+      <section class="tabs-panel">
+        <button id="tab-analytics" class="tab-btn active">Analytics Dashboard</button>
+        <button id="tab-script-history" class="tab-btn">Script Blockage History</button>
       </section>
 
       <section class="filter-panel">
@@ -58,123 +67,150 @@
         </div>
       </section>
 
-      <section class="metrics-grid">
-        <article class="metric-card">
-          <p class="metric-label">Blocked trackers</p>
-          <h2 id="blocked-count">0</h2>
-          <p class="metric-footnote">Total requests actively neutralized</p>
-        </article>
-        <article class="metric-card">
-          <p class="metric-label">Total events</p>
-          <h2 id="total-events">0</h2>
-          <p class="metric-footnote">Observed telemetry events received</p>
-        </article>
-        <article class="metric-card">
-          <p class="metric-label">Unique trackers</p>
-          <h2 id="unique-trackers">0</h2>
-          <p class="metric-footnote">Distinct tracker domains detected</p>
-        </article>
-        <article class="metric-card">
-          <p class="metric-label">Block rate</p>
-          <h2 id="block-rate">0%</h2>
-          <p class="metric-footnote">Blocked versus total observed events</p>
-        </article>
-      </section>
+      <div id="analytics-view">
+        <section class="metrics-grid">
+          <article class="metric-card">
+            <p class="metric-label">Blocked trackers</p>
+            <h2 id="blocked-count">0</h2>
+            <p class="metric-footnote">Total requests actively neutralized</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Total events</p>
+            <h2 id="total-events">0</h2>
+            <p class="metric-footnote">Observed telemetry events received</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Unique trackers</p>
+            <h2 id="unique-trackers">0</h2>
+            <p class="metric-footnote">Distinct tracker domains detected</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Block rate</p>
+            <h2 id="block-rate">0%</h2>
+            <p class="metric-footnote">Blocked versus total observed events</p>
+          </article>
+        </section>
+  
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Registered Installs</h3>
+            <span class="panel-tag">Click any card to filter</span>
+          </div>
+          <div id="install-cards" class="install-grid">
+            <p class="empty-state">No installs have been registered yet.</p>
+          </div>
+        </section>
+  
+        <section class="content-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Top Tracker Pressure</h3>
+              <span class="panel-tag">Top 5 domains</span>
+            </div>
+            <div id="top-trackers" class="bars-list">
+              <p class="empty-state">No tracker activity yet</p>
+            </div>
+          </article>
+  
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Threat Classification</h3>
+              <span class="panel-tag">ML-based categorization</span>
+            </div>
+            <div id="classification-breakdown" class="bars-list">
+              <p class="empty-state">Waiting for classification telemetry</p>
+            </div>
+          </article>
+  
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Traffic Shape</h3>
+              <span class="panel-tag">Request type mix</span>
+            </div>
+            <div id="request-types" class="bars-list">
+              <p class="empty-state">Waiting for request telemetry</p>
+            </div>
+          </article>
+        </section>
+  
+        <section class="content-grid">
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Protection Snapshot</h3>
+              <span class="panel-tag">Live signals</span>
+            </div>
+            <div class="snapshot-grid">
+              <div class="snapshot-card">
+                <p class="snapshot-label">Service status</p>
+                <h4 id="service-status">Online</h4>
+              </div>
+              <div class="snapshot-card">
+                <p class="snapshot-label">Third-party hits</p>
+                <h4 id="third-party-count">0</h4>
+              </div>
+              <div class="snapshot-card">
+                <p class="snapshot-label">Primary request type</p>
+                <h4 id="primary-request-type">N/A</h4>
+              </div>
+              <div class="snapshot-card">
+                <p class="snapshot-label">Latest tracker</p>
+                <h4 id="latest-tracker">No data</h4>
+              </div>
+            </div>
+          </article>
+  
+          <article class="panel">
+            <div class="panel-header">
+              <h3>Recent Events</h3>
+              <span class="panel-tag">Newest first</span>
+            </div>
+            <div class="table-wrap">
+              <table class="events-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Install</th>
+                    <th>Tracker</th>
+                    <th>Type</th>
+                    <th>Origin</th>
+                    <th>Category</th>
+                    <th>Decision</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-events">
+                  <tr>
+                    <td colspan="7" class="empty-cell">No events received yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
 
-      <section class="panel">
+      <section id="script-history-view" class="panel" hidden>
         <div class="panel-header">
-          <h3>Registered Installs</h3>
-          <span class="panel-tag">Click any card to filter</span>
+          <h3>Website Script Blockage History</h3>
+          <span class="panel-tag">Tracker scripts blocked</span>
         </div>
-        <div id="install-cards" class="install-grid">
-          <p class="empty-state">No installs have been registered yet.</p>
+        <div class="table-wrap">
+          <table class="events-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Install</th>
+                <th>Origin Site</th>
+                <th>Blocked Script URL</th>
+                <th>Category</th>
+              </tr>
+            </thead>
+            <tbody id="script-blockage-events">
+              <tr>
+                <td colspan="5" class="empty-cell">No blocked scripts found</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-      </section>
-
-      <section class="content-grid">
-        <article class="panel">
-          <div class="panel-header">
-            <h3>Top Tracker Pressure</h3>
-            <span class="panel-tag">Top 5 domains</span>
-          </div>
-          <div id="top-trackers" class="bars-list">
-            <p class="empty-state">No tracker activity yet</p>
-          </div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-header">
-            <h3>Threat Classification</h3>
-            <span class="panel-tag">ML-based categorization</span>
-          </div>
-          <div id="classification-breakdown" class="bars-list">
-            <p class="empty-state">Waiting for classification telemetry</p>
-          </div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-header">
-            <h3>Traffic Shape</h3>
-            <span class="panel-tag">Request type mix</span>
-          </div>
-          <div id="request-types" class="bars-list">
-            <p class="empty-state">Waiting for request telemetry</p>
-          </div>
-        </article>
-      </section>
-
-      <section class="content-grid">
-        <article class="panel">
-          <div class="panel-header">
-            <h3>Protection Snapshot</h3>
-            <span class="panel-tag">Live signals</span>
-          </div>
-          <div class="snapshot-grid">
-            <div class="snapshot-card">
-              <p class="snapshot-label">Service status</p>
-              <h4 id="service-status">Online</h4>
-            </div>
-            <div class="snapshot-card">
-              <p class="snapshot-label">Third-party hits</p>
-              <h4 id="third-party-count">0</h4>
-            </div>
-            <div class="snapshot-card">
-              <p class="snapshot-label">Primary request type</p>
-              <h4 id="primary-request-type">N/A</h4>
-            </div>
-            <div class="snapshot-card">
-              <p class="snapshot-label">Latest tracker</p>
-              <h4 id="latest-tracker">No data</h4>
-            </div>
-          </div>
-        </article>
-
-        <article class="panel">
-          <div class="panel-header">
-            <h3>Recent Events</h3>
-            <span class="panel-tag">Newest first</span>
-          </div>
-          <div class="table-wrap">
-            <table class="events-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Install</th>
-                  <th>Tracker</th>
-                  <th>Type</th>
-                  <th>Origin</th>
-                  <th>Category</th>
-                  <th>Decision</th>
-                </tr>
-              </thead>
-              <tbody id="recent-events">
-                <tr>
-                  <td colspan="7" class="empty-cell">No events received yet</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </article>
       </section>
     </main>
 

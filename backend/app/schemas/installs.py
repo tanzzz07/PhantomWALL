@@ -9,6 +9,8 @@ class RegisterInstallRequest(BaseModel):
     extension_version: str | None = None
     browser_name: str | None = "Chrome"
     notes: str | None = None
+    username: str | None = None
+
 
 
 class RegisterInstallResponse(BaseModel):

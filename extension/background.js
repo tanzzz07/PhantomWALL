@@ -31,6 +31,7 @@ const defaultConfig = {
   backendEndpoint: DEFAULT_BACKEND_ENDPOINT,
   displayName: "",
   inviteCode: "",
+  username: "",
   installId: null,
   installToken: null,
   registeredAt: null,
@@ -259,6 +260,7 @@ async function getConfigSnapshot() {
     backendEndpoint: configState.backendEndpoint,
     displayName: configState.displayName,
     inviteCode: configState.inviteCode,
+    username: configState.username || "",
     installId: configState.installId,
     registeredAt: configState.registeredAt,
     isRegistered: Boolean(configState.installId && configState.installToken),
@@ -281,6 +283,7 @@ async function saveConfig(payload) {
     ),
     displayName: (payload.displayName ?? configState.displayName).trim(),
     inviteCode: (payload.inviteCode ?? configState.inviteCode).trim(),
+    username: (payload.username ?? configState.username ?? "").trim(),
     browserName: payload.browserName ?? configState.browserName,
     extensionVersion: chrome.runtime.getManifest().version,
   };
@@ -322,6 +325,7 @@ async function registerInstall(payload) {
         invite_code: configState.inviteCode,
         extension_version: chrome.runtime.getManifest().version,
         browser_name: configState.browserName,
+        username: configState.username || null,
       }),
     });
 

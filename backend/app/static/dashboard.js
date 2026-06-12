@@ -3,6 +3,8 @@ const state = {
   currentInstallId: "",
   socket: null,
   reconnectTimer: null,
+  isRegisterMode: false,
+  activeTab: "analytics",
 };
 
 const elements = {
@@ -29,13 +31,79 @@ const elements = {
   latestTracker: document.getElementById("latest-tracker"),
   recentEvents: document.getElementById("recent-events"),
   installCards: document.getElementById("install-cards"),
+  // New elements
+  logoutBtn: document.getElementById("logout-btn"),
+  tabAnalytics: document.getElementById("tab-analytics"),
+  tabScriptHistory: document.getElementById("tab-script-history"),
+  analyticsView: document.getElementById("analytics-view"),
+  scriptHistoryView: document.getElementById("script-history-view"),
+  scriptBlockageEvents: document.getElementById("script-blockage-events"),
+  toggleAuthMode: document.getElementById("toggle-auth-mode"),
+  authEyebrow: document.getElementById("auth-eyebrow"),
+  authTitle: document.getElementById("auth-title"),
+  authDesc: document.getElementById("auth-desc"),
+  authSubmitBtn: document.getElementById("auth-submit-btn"),
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
   elements.loginForm.addEventListener("submit", handleLogin);
   elements.installFilter.addEventListener("change", async (event) => {
     state.currentInstallId = event.target.value;
-    await fetchStats();
+    if (state.activeTab === "analytics") {
+      await fetchStats();
+    } else {
+      await fetchBlockedScripts();
+    }
+  });
+
+  elements.toggleAuthMode.addEventListener("click", (event) => {
+    event.preventDefault();
+    state.isRegisterMode = !state.isRegisterMode;
+    elements.loginError.textContent = "";
+    elements.loginError.style.color = "var(--danger)";
+
+    if (state.isRegisterMode) {
+      elements.authEyebrow.textContent = "New account registration";
+      elements.authTitle.textContent = "Create Dashboard Account";
+      elements.authDesc.textContent = "Register a personal account to track and view your specific extension installs and telemetry.";
+      elements.authSubmitBtn.textContent = "Register account";
+      document.getElementById("toggle-text-prefix").textContent = "Already have an account?";
+      elements.toggleAuthMode.textContent = "Log in";
+    } else {
+      elements.authEyebrow.textContent = "Admin access";
+      elements.authTitle.textContent = "PhantomWall Command";
+      elements.authDesc.textContent = "Sign in to review all registered installs, live blocked tracker events, and shared telemetry across your deployed extension fleet.";
+      elements.authSubmitBtn.textContent = "Enter dashboard";
+      document.getElementById("toggle-text-prefix").textContent = "Don't have an account?";
+      elements.toggleAuthMode.textContent = "Register";
+    }
+  });
+
+  elements.logoutBtn.addEventListener("click", () => {
+    clearAdminSession();
+    if (state.socket) {
+      state.socket.close();
+      state.socket = null;
+    }
+    showLogin();
+  });
+
+  elements.tabAnalytics.addEventListener("click", () => {
+    state.activeTab = "analytics";
+    elements.tabAnalytics.classList.add("active");
+    elements.tabScriptHistory.classList.remove("active");
+    elements.analyticsView.hidden = false;
+    elements.scriptHistoryView.hidden = true;
+    void fetchStats();
+  });
+
+  elements.tabScriptHistory.addEventListener("click", () => {
+    state.activeTab = "script-history";
+    elements.tabAnalytics.classList.remove("active");
+    elements.tabScriptHistory.classList.add("active");
+    elements.analyticsView.hidden = true;
+    elements.scriptHistoryView.hidden = false;
+    void fetchBlockedScripts();
   });
 
   if (state.adminToken) {
@@ -48,29 +116,55 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function handleLogin(event) {
   event.preventDefault();
   elements.loginError.textContent = "";
+  elements.loginError.style.color = "var(--danger)";
 
-  try {
-    const response = await fetch("/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        username: elements.username.value.trim(),
-        password: elements.password.value,
-      }),
-    });
+  const username = elements.username.value.trim();
+  const password = elements.password.value;
 
-    if (!response.ok) {
-      throw new Error("Login failed");
+  if (state.isRegisterMode) {
+    try {
+      const response = await fetch("/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json();
+        throw new Error(payload?.detail || "Registration failed");
+      }
+
+      elements.loginError.textContent = "Registration successful! You can now log in.";
+      elements.loginError.style.color = "var(--accent-2)";
+      elements.toggleAuthMode.click();
+      elements.username.value = username;
+      elements.password.value = "";
+    } catch (error) {
+      elements.loginError.textContent = error.message;
     }
+  } else {
+    try {
+      const response = await fetch("/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    const payload = await response.json();
-    state.adminToken = payload.access_token;
-    localStorage.setItem("phantomwallAdminToken", state.adminToken);
-    await bootstrapAuthenticatedView();
-  } catch (error) {
-    elements.loginError.textContent = "Incorrect admin username or password.";
+      if (!response.ok) {
+        throw new Error("Invalid username or password");
+      }
+
+      const payload = await response.json();
+      state.adminToken = payload.access_token;
+      localStorage.setItem("phantomwallAdminToken", state.adminToken);
+      await bootstrapAuthenticatedView();
+    } catch (error) {
+      elements.loginError.textContent = "Incorrect username or password.";
+    }
   }
 }
 
@@ -78,7 +172,12 @@ async function bootstrapAuthenticatedView() {
   try {
     await fetchAdminIdentity();
     showDashboard();
-    await Promise.all([fetchInstalls(), fetchStats()]);
+    await fetchInstalls();
+    if (state.activeTab === "analytics") {
+      await fetchStats();
+    } else {
+      await fetchBlockedScripts();
+    }
     connectLiveStream();
   } catch (error) {
     clearAdminSession();
@@ -119,6 +218,21 @@ async function fetchStats() {
   const stats = await response.json();
   renderDashboard(stats);
   setBackendStatus(true);
+}
+
+async function fetchBlockedScripts() {
+  const query = new URLSearchParams({ limit: "50" });
+  if (state.currentInstallId) {
+    query.set("install_id", state.currentInstallId);
+  }
+
+  const response = await authedFetch(`/blocked-scripts?${query.toString()}`);
+  if (!response.ok) {
+    throw new Error("Blocked scripts request failed");
+  }
+
+  const scripts = await response.json();
+  renderBlockedScripts(scripts);
 }
 
 function renderDashboard(stats) {
@@ -224,7 +338,11 @@ function renderInstallCards(installs) {
     card.addEventListener("click", async () => {
       state.currentInstallId = install.install_id;
       elements.installFilter.value = install.install_id;
-      await fetchStats();
+      if (state.activeTab === "analytics") {
+        await fetchStats();
+      } else {
+        await fetchBlockedScripts();
+      }
     });
     elements.installCards.appendChild(card);
   });
@@ -293,6 +411,35 @@ function renderRecentEvents(events) {
   });
 }
 
+function renderBlockedScripts(scripts) {
+  elements.scriptBlockageEvents.innerHTML = "";
+
+  if (!scripts.length) {
+    elements.scriptBlockageEvents.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-cell">No blocked scripts found</td>
+      </tr>
+    `;
+    return;
+  }
+
+  scripts.forEach((script) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${formatTimestamp(script.occurred_at)}</td>
+      <td>${escapeHtml(script.install_name || "Unknown")}</td>
+      <td>${escapeHtml(formatOrigin(script.page_origin))}</td>
+      <td class="tracker-cell" style="word-break: break-all; max-width: 400px;">${escapeHtml(script.url)}</td>
+      <td>
+        <span class="category-pill ${(script.classification || "Safe").toLowerCase()}">
+          ${escapeHtml(script.classification || "Safe")}
+        </span>
+      </td>
+    `;
+    elements.scriptBlockageEvents.appendChild(row);
+  });
+}
+
 function connectLiveStream() {
   if (!state.adminToken) {
     return;
@@ -315,14 +462,20 @@ function connectLiveStream() {
   state.socket.onmessage = async (event) => {
     const payload = JSON.parse(event.data);
     if (payload?.type === "stats.snapshot") {
-      renderDashboard(payload.data);
+      if (state.activeTab === "analytics") {
+        renderDashboard(payload.data);
+      }
       setBackendStatus(true);
       return;
     }
 
     if (payload?.type === "telemetry.received") {
       await fetchInstalls();
-      await fetchStats();
+      if (state.activeTab === "analytics") {
+        await fetchStats();
+      } else {
+        await fetchBlockedScripts();
+      }
       setSocketStatus("online", "Live stream active");
     }
   };
@@ -351,6 +504,7 @@ function setSocketStatus(mode, label) {
 function showLogin() {
   elements.authPanel.hidden = false;
   elements.dashboardShell.hidden = true;
+  elements.authPanel.classList.remove("authenticated");
 }
 
 function showDashboard() {
@@ -416,3 +570,4 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
+

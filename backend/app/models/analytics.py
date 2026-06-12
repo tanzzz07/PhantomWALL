@@ -7,6 +7,28 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
+    username: Mapped[str] = mapped_column(String(120), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    installs: Mapped[list["Install"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+
 class Install(Base):
     __tablename__ = "installs"
 
@@ -30,7 +52,14 @@ class Install(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
+    user: Mapped["User | None"] = relationship(back_populates="installs")
     events: Mapped[list["TrackerEventRecord"]] = relationship(
         back_populates="install",
         cascade="all, delete-orphan",

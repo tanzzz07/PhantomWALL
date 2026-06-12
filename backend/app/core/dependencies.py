@@ -42,10 +42,10 @@ async def require_admin(
             detail="Invalid or expired admin token.",
         ) from error
 
-    if payload.get("scope") != "admin":
+    if payload.get("scope") not in ("admin", "user"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin scope required.",
+            detail="Admin or user scope required.",
         )
 
     return payload

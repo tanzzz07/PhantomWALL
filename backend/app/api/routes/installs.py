@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -8,6 +9,7 @@ from app.core.dependencies import (
     require_admin,
 )
 from app.db import get_db_session
+from app.models import User
 from app.schemas.installs import (
     InstallListResponse,
     RegisterInstallRequest,
@@ -32,6 +34,19 @@ async def register_install(
             detail="Invalid invite code.",
         )
 
+    user_id = None
+    if payload.username:
+        result = await session.execute(
+            select(User).where(User.username == payload.username)
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"User '{payload.username}' not found. Please register on the dashboard first.",
+            )
+        user_id = user.id
+
     plain_token = generate_install_token()
     install = await analytics_service.create_install(
         session=session,
@@ -40,6 +55,7 @@ async def register_install(
         extension_version=payload.extension_version,
         browser_name=payload.browser_name,
         notes=payload.notes,
+        user_id=user_id,
     )
     return RegisterInstallResponse(
         install_id=install.id,
@@ -56,5 +72,7 @@ async def list_installs(
     analytics_service: AnalyticsService = Depends(get_analytics_service),
     session: AsyncSession = Depends(get_db_session),
 ) -> InstallListResponse:
-    installs = await analytics_service.list_installs(session=session)
+    user_id = _admin.get("user_id") if _admin.get("scope") == "user" else None
+    installs = await analytics_service.list_installs(session=session, user_id=user_id)
     return InstallListResponse(installs=installs)
+

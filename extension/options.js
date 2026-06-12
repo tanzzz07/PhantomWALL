@@ -2,6 +2,7 @@ const formElement = document.getElementById("setup-form");
 const backendEndpointElement = document.getElementById("backend-endpoint");
 const displayNameElement = document.getElementById("display-name");
 const inviteCodeElement = document.getElementById("invite-code");
+const usernameElement = document.getElementById("username");
 const registerButtonElement = document.getElementById("register-button");
 const feedbackElement = document.getElementById("form-feedback");
 const healthPillElement = document.getElementById("health-pill");
@@ -59,6 +60,7 @@ function getPayload() {
     backendEndpoint: backendEndpointElement.value.trim(),
     displayName: displayNameElement.value.trim(),
     inviteCode: inviteCodeElement.value.trim(),
+    username: usernameElement.value.trim(),
   };
 }
 
@@ -66,6 +68,8 @@ function renderConfig(config) {
   backendEndpointElement.value = config.backendEndpoint || "";
   displayNameElement.value = config.displayName || "";
   inviteCodeElement.value = config.inviteCode || "";
+  usernameElement.value = config.username || "";
+
   extensionVersionElement.textContent = config.extensionVersion || "Unknown";
   installIdElement.textContent = config.installId || "Not registered";
   registeredAtElement.textContent = config.registeredAt
