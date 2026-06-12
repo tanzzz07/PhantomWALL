@@ -1,8 +1,16 @@
+import os
 from functools import lru_cache
 from typing import Annotated
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+
+def get_default_db_url() -> str:
+    """Fallback to local/container SQLite database if no custom url is configured."""
+    if os.path.exists("/app/data") and os.access("/app/data", os.W_OK):
+        return "sqlite+aiosqlite:////app/data/phantomwall.db"
+    return "sqlite+aiosqlite:///phantomwall.db"
 
 
 class Settings(BaseSettings):
@@ -13,9 +21,7 @@ class Settings(BaseSettings):
 
     app_name: str = "PhantomWall Backend"
     app_env: str = "development"
-    database_url: str = (
-        "postgresql+asyncpg://phantomwall:phantomwall@postgres:5432/phantomwall"
-    )
+    database_url: str = Field(default_factory=get_default_db_url)
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost", "http://127.0.0.1"]
     )
