@@ -291,3 +291,5 @@ Whenever you push code changes to the `main` branch on GitHub, the pipeline runs
 - Rotate the invite code and admin secrets before public rollout
 - Consider minimizing or anonymizing stored page-level data if privacy requirements tighten
 - Add database migrations before long-term production use
+
+
