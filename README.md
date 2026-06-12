@@ -8,10 +8,12 @@ PhantomWall is a distributed browser privacy defense system built with a Chrome 
 - Local extension analytics for offline-first behavior
 - Options page for remote backend setup and install registration
 - Authenticated install telemetry via per-install API tokens
-- FastAPI backend with PostgreSQL persistence
-- Admin login for the hosted analytics dashboard
+- FastAPI backend with PostgreSQL and SQLite support
+- ML-Based Tracker Classification (classifying events into Fingerprinting, Advertising, Analytics, Tracker, or Safe based on entropy, URL patterns, frequency, and third-party behavior)
+- Admin login for the hosted analytics dashboard with classification breakdowns
 - Real-time dashboard refresh through WebSockets
 - Dockerized backend and database stack
+- Full GitHub Actions CI/CD Pipeline (Automated testing, GHCR build, and Hugging Face deployment)
 
 ## Project structure
 
@@ -237,6 +239,50 @@ The extension ships with sample rules for:
 - `ads-twitter.com`
 - `bat.bing.com`
 - `snap.licdn.com`
+
+## ML-Based Tracker Classification
+
+PhantomWall features a pure-Python **Multinomial Logistic Regression (Linear Softmax) Classifier** in the backend that runs on each incoming telemetry event. The classifier scores events using 9 extracted features:
+
+1.  **Domain Entropy:** Shannon entropy of the domain name to detect random/algorithmically generated tracking subdomains.
+2.  **URL Length:** Length of the request URL (scaled).
+3.  **Parameter Count:** The number of query parameters passed in the request (scaled).
+4.  **Request Frequency:** Live request rate (requests to the same domain by the same install in the last 5 minutes).
+5.  **Third-Party Behavior:** Whether the request originates from a third-party context.
+6.  **Fingerprinting Keywords:** Presence of fingerprinting vectors (e.g. `canvas`, `webgl`, `navigator`).
+7.  **Advertising Keywords:** Presence of ad indicators (e.g. `ad`, `doubleclick`, `pixel`).
+8.  **Analytics Keywords:** Presence of analytics vectors (e.g. `telemetry`, `ga.js`, `stats`).
+9.  **General Tracker Keywords:** Presence of general tracking terms (e.g. `track`, `collect`, `log`).
+
+Classification outputs one of: `Fingerprinting` (Orange), `Advertising` (Red), `Analytics` (Blue), `Tracker` (Purple), or `Safe` (Green), rendered with high-contrast pills in the admin dashboard.
+
+---
+
+## Continuous Integration & Deployment (CI/CD)
+
+The project includes a **GitHub Actions CI/CD Pipeline** defined in `.github/workflows/docker-publish.yml` with the following automated jobs:
+
+1.  **Test Job (CI):** Installs Python dependencies and runs the workspace tests (`backend/tests/test_classifier.py` and `backend/tests/test_db_analytics.py`) using an in-memory SQLite database.
+2.  **Build Job:** Compiles and publishes the backend Docker image to GitHub Container Registry (`ghcr.io`).
+3.  **Deploy Job (CD):** Automatically deploys the backend codebase to Hugging Face Spaces.
+
+### Deploying to Hugging Face Spaces via GitHub CD
+
+1.  Create a **Docker** space on Hugging Face (choose the blank Docker SDK).
+2.  In your GitHub repository, go to **Settings** -> **Secrets and variables** -> **Actions** and add these Secrets:
+    *   `HF_TOKEN`: A Hugging Face write access token.
+    *   `HF_SPACE_NAME`: Your Space name formatted as `username/space-name` (e.g. `tanzzz07/phantomwall`).
+3.  In your Hugging Face Space settings, add your app environment variables:
+    *   `PHANTOMWALL_DATABASE_URL`: `sqlite+aiosqlite:////app/data/phantomwall.db`
+    *   `PHANTOMWALL_ADMIN_USERNAME`: (your dashboard username)
+    *   `PHANTOMWALL_ADMIN_PASSWORD`: (your dashboard password)
+    *   `PHANTOMWALL_JWT_SECRET_KEY`: (a secure random string)
+    *   `PHANTOMWALL_REGISTRATION_INVITE_CODE`: (the code used by extensions to connect)
+    *   `PHANTOMWALL_PUBLIC_BACKEND_URL`: `https://<your-username>-<your-space-name>.hf.space`
+
+Whenever you push code changes to the `main` branch on GitHub, the pipeline runs the test suite, builds the container image, and pushes the code to Hugging Face, where it is instantly redeployed.
+
+---
 
 ## Production notes
 
