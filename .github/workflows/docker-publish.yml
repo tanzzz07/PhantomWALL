@@ -32,8 +32,8 @@ jobs:
           python -m pip install --upgrade pip
           # Exclude asyncpg for testing inside CI to avoid compilation issues
           grep -v "asyncpg" backend/requirements.txt > temp_reqs.txt
-          pip install -r temp_reqs.txt
-          pip install ruff bandit pytest httpx
+          python -m pip install -r temp_reqs.txt
+          python -m pip install ruff bandit pytest httpx
 
       - name: Lint with Ruff
         run: ruff check backend/app backend/dataset_pipeline backend/feature_engineering backend/training backend/evaluation backend/inference || echo "Ruff warning"
