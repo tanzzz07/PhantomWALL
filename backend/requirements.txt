@@ -15,5 +15,6 @@ requests>=2.31.0
 matplotlib>=3.7.0
 seaborn>=0.12.0
 shap>=0.42.0
+httpx>=0.24.0
 
 
