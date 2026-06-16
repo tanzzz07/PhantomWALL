@@ -1,0 +1,13 @@
+.git
+.github
+extension
+backend/.venv
+backend/.pytest_cache
+backend/__pycache__
+backend/phantomwall.db
+backend/data/raw
+backend/data/processed
+backend/data/telemetry
+*.csv
+*.json
+*.md

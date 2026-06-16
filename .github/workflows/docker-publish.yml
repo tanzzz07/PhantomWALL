@@ -33,14 +33,26 @@ jobs:
           # Exclude asyncpg for testing inside CI to avoid compilation issues
           grep -v "asyncpg" backend/requirements.txt > temp_reqs.txt
           pip install -r temp_reqs.txt
+          pip install ruff bandit pytest
 
-      - name: Run Classifier Unit Tests
-        run: |
-          python backend/tests/test_classifier.py
+      - name: Lint with Ruff
+        run: ruff check backend/app backend/dataset_pipeline backend/feature_engineering backend/training backend/evaluation backend/inference || echo "Ruff warning"
 
-      - name: Run Database Integration Tests
+      - name: Security Scan with Bandit
+        run: bandit -r backend/app backend/dataset_pipeline backend/feature_engineering backend/training backend/evaluation backend/inference -ll || echo "Bandit warnings found"
+
+      - name: Run Unit Tests with Pytest
+        run: pytest backend/tests/
+
+      - name: Validate ML Training Pipeline
         run: |
-          python backend/tests/test_db_analytics.py
+          python backend/dataset_pipeline/collector.py
+          python backend/dataset_pipeline/telemetry_dataset_builder.py
+          python backend/feature_engineering/extractor.py
+          python backend/training/trainer.py
+          python backend/evaluation/evaluator.py
+          python backend/evaluation/shap_analysis.py
+
 
   build:
     name: Build & Push Docker Image
@@ -89,6 +101,16 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner (Repo Scan)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          exit-code: '0'
+          severity: 'CRITICAL,HIGH'
+
 
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}

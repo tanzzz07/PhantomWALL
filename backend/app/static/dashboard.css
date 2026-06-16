@@ -419,6 +419,13 @@ h1 {
   border: 1px solid rgba(201, 142, 255, 0.22);
 }
 
+.category-pill.suspicious {
+  color: #c98eff;
+  background: rgba(201, 142, 255, 0.12);
+  border: 1px solid rgba(201, 142, 255, 0.22);
+}
+
+
 .category-pill.safe {
   color: var(--accent-2);
   background: rgba(42, 255, 180, 0.12);

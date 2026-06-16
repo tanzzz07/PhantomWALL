@@ -1,3 +1,13 @@
+---
+title: PhantomWALL
+emoji: 🛡️
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # PhantomWall
 
 PhantomWall is a distributed browser privacy defense system built with a Chrome Manifest V3 extension and a FastAPI backend. This version supports hosted multi-user analytics: each browser install can register with your backend, send authenticated tracker events, and appear in a central admin dashboard.

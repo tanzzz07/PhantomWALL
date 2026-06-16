@@ -55,6 +55,36 @@ class TrackerClassifier:
         is_third_party: bool
     ) -> str:
         """Classify a request using feature extraction and logit scoring."""
+        # Try to run ML prediction first if available
+        try:
+            from inference.predictor import Predictor
+            predictor = Predictor()
+            if predictor.model_loaded:
+                # Infer request type dynamically from URL or default to other
+                inferred_req_type = "other"
+                url_lower = url.lower()
+                if ".js" in url_lower or "fp.js" in url_lower:
+                    inferred_req_type = "script"
+                elif any(ext in url_lower for ext in [".png", ".gif", ".jpg", ".jpeg", "/pixel"]):
+                    inferred_req_type = "image"
+                elif any(term in url_lower for term in ["/collect", "/analytics", "/telemetry"]):
+                    inferred_req_type = "xmlhttprequest"
+
+                res = predictor.predict(
+                    url=url,
+                    request_type=inferred_req_type,
+                    third_party=is_third_party,
+                    request_frequency=recent_count,
+                    referrer_domain=""
+                )
+                if res:
+                    ml_pred = res["prediction"]
+                    if ml_pred == "Suspicious":
+                        return "Tracker"
+                    return ml_pred
+        except Exception:
+            pass
+
         domain_lower = domain.lower()
         url_lower = url.lower()
 

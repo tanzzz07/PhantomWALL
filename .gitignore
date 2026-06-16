@@ -49,3 +49,17 @@ build/
 # Chrome extension temp files
 *.pem
 extension/_metadata/
+
+# Large Kaggle datasets & temporary pipeline data
+backend/data/balanced_urls.csv/
+backend/data/dataset_full.csv/
+backend/data/phishing_url_dataset_unique.csv
+backend/data/raw/tranco_top_domains.csv
+backend/data/raw/easylist.txt
+backend/data/raw/easyprivacy.txt
+backend/data/raw/disconnect_services.json
+backend/data/final/
+backend/data/processed/
+backend/data/telemetry/
+backend/telemetry/
+backend/data/raw/tranco_10000.csv
