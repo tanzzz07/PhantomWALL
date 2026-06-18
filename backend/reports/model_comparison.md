@@ -6,9 +6,9 @@ The pipeline evaluated three models. The primary optimization metric is **Macro 
 
 | Model | Accuracy | Precision (Macro) | Recall (Macro) | Macro F1 | Weighted F1 | ROC-AUC | Avg Inference (ms) | Size (KB) |
 |---|---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.9002 | 0.9011 | 0.9001 | **0.9002** | 0.9003 | 0.9834 | 0.0218 | 2.6 |
-| Random Forest | 0.9318 | 0.9327 | 0.9317 | **0.9321** | 0.9321 | 0.9919 | 0.0260 | 11741.7 |
-| XGBoost | 0.9447 | 0.9452 | 0.9447 | **0.9447** | 0.9448 | 0.9951 | 0.0186 | 1353.4 |
+| Logistic Regression | 0.9548 | 0.9509 | 0.9257 | **0.9374** | 0.9539 | 0.9954 | 0.0256 | 2.6 |
+| Random Forest | 0.9761 | 0.9794 | 0.9497 | **0.9629** | 0.9754 | 0.9980 | 0.0201 | 6113.8 |
+| XGBoost | 0.9801 | 0.9762 | 0.9680 | **0.9720** | 0.9799 | 0.9988 | 0.0126 | 880.1 |
 
 ## Strengths & Weaknesses Analysis
 
@@ -28,37 +28,37 @@ The pipeline evaluated three models. The primary optimization metric is **Macro 
 
 **Winner**: `XGBoost`
 
-We deploy `XGBoost` as the default model due to its superior Macro F1 score (0.9447) and efficient performance profile.
+We deploy `XGBoost` as the default model due to its superior Macro F1 score (0.9720) and efficient performance profile.
 
 ## Confusion Matrices
 
 ### Logistic Regression
 ```text
 Labels order: advertising, analytics, fingerprinting, safe, suspicious
- 271     4     0     0     4
-  16   220     0     7    35
-   3     9   261     2     4
-   0    12     0   261     6
-   0    23     0    14   241
+ 590     0     0     0    10
+   0   589    11     0     0
+   0    24    86     0     0
+   0     0     0     1     0
+  23     0     0     0   171
 ```
 
 ### Random Forest
 ```text
 Labels order: advertising, analytics, fingerprinting, safe, suspicious
- 270     7     1     0     1
-  13   241     2     3    19
-   3    11   264     0     1
-   0     4     0   272     3
-   0    24     0     3   251
+ 597     1     0     0     2
+   0   596     4     0     0
+   0    23    87     0     0
+   0     0     0     1     0
+   6     0     0     0   188
 ```
 
 ### XGBoost
 ```text
 Labels order: advertising, analytics, fingerprinting, safe, suspicious
- 270     5     2     0     2
-  12   246     1     1    18
-   3    10   263     0     3
-   0     1     0   275     3
-   1    12     0     3   262
+ 595     1     0     0     4
+   0   593     7     0     0
+   0    12    98     0     0
+   0     0     0     1     0
+   6     0     0     0   188
 ```
 

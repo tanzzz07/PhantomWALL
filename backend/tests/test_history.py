@@ -14,11 +14,34 @@ import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import select, func
 
+from unittest.mock import patch
+
 from app.models import Base, Install, BlockedRequest, DomainReputation
 from app.services.analytics import AnalyticsService
 from app.schemas.analytics import TrackEventIn
 from app.services.explanation_service import ExplanationService
 from app.services.retention import run_retention_cleanup
+
+
+@pytest.fixture(autouse=True)
+def mock_predictor_and_classifier():
+    from inference.predictor import Predictor
+    p = Predictor()
+    original_state = p.model_loaded
+    p.model_loaded = False
+
+    def mock_classify(domain, url, recent_count, is_third_party):
+        url_lower = url.lower()
+        if "fingerprint" in url_lower:
+            return "Fingerprinting"
+        if "safe" in url_lower:
+            return "Safe"
+        return "Advertising"
+
+    with patch("app.services.analytics.TrackerClassifier.classify", side_effect=mock_classify):
+        yield
+
+    p.model_loaded = original_state
 
 
 @pytest.mark.anyio
@@ -118,8 +141,8 @@ async def test_domain_reputation_updates():
 
         # Ingest same domain twice: first blocked, second observed
         event_1 = TrackEventIn(
-            url="https://badtracker.com/pixel.gif",
-            domain="badtracker.com",
+            url="https://badadvertising.com/pixel.gif",
+            domain="badadvertising.com",
             request_type="image",
             blocked=True,
             timestamp=datetime.now(timezone.utc)
@@ -127,8 +150,8 @@ async def test_domain_reputation_updates():
         await service.ingest_event(session, install, event_1)
 
         event_2 = TrackEventIn(
-            url="https://badtracker.com/some-script.js",
-            domain="badtracker.com",
+            url="https://badadvertising.com/some-script.js",
+            domain="badadvertising.com",
             request_type="script",
             blocked=False,
             timestamp=datetime.now(timezone.utc)
@@ -136,7 +159,7 @@ async def test_domain_reputation_updates():
         await service.ingest_event(session, install, event_2)
 
         # Check reputation metrics
-        rep = await service.get_reputation_by_domain(session, "badtracker.com")
+        rep = await service.get_reputation_by_domain(session, "badadvertising.com")
         assert rep is not None
         assert rep.times_seen == 2
         assert rep.times_blocked == 1

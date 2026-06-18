@@ -1,8 +1,8 @@
 {
   "algorithm": "XGBoost",
   "version": "1.0",
-  "macro_f1": 0.9447304620670354,
-  "accuracy": 0.9447236180904522,
-  "inference_time_ms": 0.018636468036250027,
-  "timestamp": "2026-06-16T07:02:45Z"
+  "macro_f1": 0.9719956778320398,
+  "accuracy": 0.9800664451827242,
+  "inference_time_ms": 0.012629302325399371,
+  "timestamp": "2026-06-18T20:23:04Z"
 }
