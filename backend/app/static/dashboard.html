@@ -4,7 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PhantomWall Analytics</title>
-    <link rel="stylesheet" href="/dashboard-assets/dashboard.css?v=1.0.1" />
+    <link rel="stylesheet" href="/dashboard-assets/dashboard.css?v=1.1.0" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
   <body>
     <div class="grid-overlay"></div>
@@ -47,6 +48,7 @@
         </div>
         <div class="hero-status">
           <button id="logout-btn" class="status-pill logout-btn">Logout</button>
+          <span id="retention-pill" class="status-pill online" style="background: rgba(42, 255, 180, 0.08); border-color: rgba(42, 255, 180, 0.15); color: var(--accent-2);">30-Day Retention Policy</span>
           <span id="backend-pill" class="status-pill online">Backend online</span>
           <span id="socket-pill" class="status-pill idle">Live stream idle</span>
           <p id="generated-at" class="status-footnote">Waiting for first snapshot</p>
@@ -55,7 +57,7 @@
 
       <section class="tabs-panel">
         <button id="tab-analytics" class="tab-btn active">Analytics Dashboard</button>
-        <button id="tab-script-history" class="tab-btn">Script Blockage History</button>
+        <button id="tab-script-history" class="tab-btn">Script History</button>
       </section>
 
       <section class="filter-panel">
@@ -67,27 +69,28 @@
         </div>
       </section>
 
+      <!-- VIEW 1: GENERAL ANALYTICS -->
       <div id="analytics-view">
         <section class="metrics-grid">
           <article class="metric-card">
-            <p class="metric-label">Blocked trackers</p>
+            <p class="metric-label">Blocked Requests</p>
             <h2 id="blocked-count">0</h2>
-            <p class="metric-footnote">Total requests actively neutralized</p>
+            <p class="metric-footnote">Neutralized trackers actively blocked</p>
           </article>
           <article class="metric-card">
-            <p class="metric-label">Total events</p>
-            <h2 id="total-events">0</h2>
-            <p class="metric-footnote">Observed telemetry events received</p>
+            <p class="metric-label">Observed Requests</p>
+            <h2 id="observed-count">0</h2>
+            <p class="metric-footnote">Allowed requests monitored</p>
           </article>
           <article class="metric-card">
-            <p class="metric-label">Unique trackers</p>
-            <h2 id="unique-trackers">0</h2>
-            <p class="metric-footnote">Distinct tracker domains detected</p>
-          </article>
-          <article class="metric-card">
-            <p class="metric-label">Block rate</p>
+            <p class="metric-label">Block Rate</p>
             <h2 id="block-rate">0%</h2>
-            <p class="metric-footnote">Blocked versus total observed events</p>
+            <p class="metric-footnote">Blocked versus observed requests</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Average Risk Score</p>
+            <h2 id="avg-risk-score">0</h2>
+            <p class="metric-footnote">Dynamic mean traffic risk index</p>
           </article>
         </section>
   
@@ -188,25 +191,129 @@
         </section>
       </div>
 
+      <!-- VIEW 2: SCRIPT HISTORY & THREAT INTEL -->
       <section id="script-history-view" class="panel" hidden>
         <div class="panel-header">
-          <h3>Website Script Blockage History</h3>
-          <span class="panel-tag">Tracker scripts blocked</span>
+          <h3>Script History & Threat Intelligence Dashboard</h3>
+          <span class="panel-tag">Real-time Telemetry logs</span>
         </div>
+
+        <!-- Phase 7: Analytics Charts Grid -->
+        <div class="history-charts-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <div class="panel" style="margin-top: 0; padding: 16px; min-height: 220px; background: rgba(3, 11, 21, 0.5); border-radius: 16px; border: 1px solid rgba(140, 168, 199, 0.1);">
+            <p class="metric-label" style="margin-bottom: 8px;">Threat Distribution</p>
+            <div style="position: relative; height: 160px; width: 100%;"><canvas id="chart-threat-dist"></canvas></div>
+          </div>
+          <div class="panel" style="margin-top: 0; padding: 16px; min-height: 220px; background: rgba(3, 11, 21, 0.5); border-radius: 16px; border: 1px solid rgba(140, 168, 199, 0.1);">
+            <p class="metric-label" style="margin-bottom: 8px;">Top Blocked Domains</p>
+            <div style="position: relative; height: 160px; width: 100%;"><canvas id="chart-top-domains"></canvas></div>
+          </div>
+          <div class="panel" style="margin-top: 0; padding: 16px; min-height: 220px; background: rgba(3, 11, 21, 0.5); border-radius: 16px; border: 1px solid rgba(140, 168, 199, 0.1);">
+            <p class="metric-label" style="margin-bottom: 8px;">Blocked Requests Over Time</p>
+            <div style="position: relative; height: 160px; width: 100%;"><canvas id="chart-over-time"></canvas></div>
+          </div>
+          <div class="panel" style="margin-top: 0; padding: 16px; min-height: 220px; background: rgba(3, 11, 21, 0.5); border-radius: 16px; border: 1px solid rgba(140, 168, 199, 0.1);">
+            <p class="metric-label" style="margin-bottom: 8px;">Top Request Types</p>
+            <div style="position: relative; height: 160px; width: 100%;"><canvas id="chart-request-types"></canvas></div>
+          </div>
+          <div class="panel" style="margin-top: 0; padding: 16px; min-height: 220px; background: rgba(3, 11, 21, 0.5); border-radius: 16px; border: 1px solid rgba(140, 168, 199, 0.1);">
+            <p class="metric-label" style="margin-bottom: 8px;">Risk Score Distribution</p>
+            <div style="position: relative; height: 160px; width: 100%;"><canvas id="chart-risk-dist"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Reputation & Alert widgets Grid -->
+        <div class="widgets-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px;">
+          <!-- Top Dangerous Domains Widget -->
+          <div class="panel" style="margin-top: 0; padding: 18px; background: rgba(3, 11, 21, 0.6); border-radius: 20px; border: 1px solid rgba(140, 168, 199, 0.1);">
+            <div class="panel-header" style="margin-bottom: 12px;">
+              <h3>Top Dangerous Domains</h3>
+              <span class="panel-tag">Domain Reputation Engine</span>
+            </div>
+            <div class="table-wrap">
+              <table class="events-table" style="min-width: 100%;">
+                <thead>
+                  <tr>
+                    <th>Domain</th>
+                    <th>Classification</th>
+                    <th>Seen</th>
+                    <th>Blocked</th>
+                    <th>Avg Risk</th>
+                    <th>Last Seen</th>
+                  </tr>
+                </thead>
+                <tbody id="dangerous-domains-list">
+                  <tr>
+                    <td colspan="6" class="empty-cell">No dangerous domains detected yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Highest Risk Event Alert -->
+          <div class="panel" style="margin-top: 0; padding: 18px; background: rgba(3, 11, 21, 0.6); border-radius: 20px; border: 1px solid rgba(140, 168, 199, 0.1);">
+            <div class="panel-header" style="margin-bottom: 12px;">
+              <h3>Highest Risk Event</h3>
+              <span class="panel-tag" style="color: var(--danger);">Critical Alert</span>
+            </div>
+            <div id="highest-risk-card" class="snapshot-card" style="border-color: rgba(255, 99, 126, 0.25); background: rgba(255, 99, 126, 0.04); display: flex; flex-direction: column; gap: 8px; min-height: 150px; justify-content: center;">
+              <p class="empty-state">No critical telemetry event detected</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search, Filter & Pagination Panel -->
+        <div class="history-controls-panel" style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+          <div style="display: flex; gap: 12px; flex: 1; min-width: 300px; flex-wrap: wrap;">
+            <input type="text" id="history-search" class="select-control" style="flex: 1; min-width: 180px; max-width: 320px;" placeholder="Search domain or URL..." />
+            
+            <select id="history-filter-class" class="select-control" style="width: auto; min-width: 140px;">
+              <option value="">All Classifications</option>
+              <option value="Safe">Safe</option>
+              <option value="Analytics">Analytics</option>
+              <option value="Advertising">Advertising</option>
+              <option value="Fingerprinting">Fingerprinting</option>
+              <option value="Suspicious">Suspicious</option>
+            </select>
+            
+            <select id="history-filter-type" class="select-control" style="width: auto; min-width: 140px;">
+              <option value="">All Request Types</option>
+              <option value="script">Script</option>
+              <option value="xmlhttprequest">XMLHttpRequest</option>
+              <option value="image">Image</option>
+              <option value="stylesheet">Stylesheet</option>
+              <option value="font">Font</option>
+              <option value="websocket">WebSocket</option>
+              <option value="other">Other</option>
+            </select>
+            <button id="cleanup-btn" class="tab-btn logout-btn" style="padding: 8px 16px; border-radius: 14px;">Trigger DB Cleanup</button>
+          </div>
+          
+          <div class="pagination-controls" style="display: flex; align-items: center; gap: 8px;">
+            <button id="history-prev-btn" class="tab-btn" style="padding: 8px 16px;">&larr; Prev</button>
+            <span id="history-page-info" style="font-size: 14px; font-weight: 600; min-width: 80px; text-align: center;">Page 1</span>
+            <button id="history-next-btn" class="tab-btn" style="padding: 8px 16px;">Next &rarr;</button>
+          </div>
+        </div>
+
+        <!-- Telemetry Data Table -->
         <div class="table-wrap">
           <table class="events-table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Install</th>
-                <th>Origin Site</th>
-                <th>Blocked Script URL</th>
-                <th>Category</th>
+                <th>Timestamp</th>
+                <th>Domain</th>
+                <th>Request Type</th>
+                <th>Classification</th>
+                <th>Confidence</th>
+                <th>Risk Score</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody id="script-blockage-events">
               <tr>
-                <td colspan="5" class="empty-cell">No blocked scripts found</td>
+                <td colspan="7" class="empty-cell">No blocked requests found</td>
               </tr>
             </tbody>
           </table>
@@ -214,6 +321,70 @@
       </section>
     </main>
 
-    <script src="/dashboard-assets/dashboard.js?v=1.0.1"></script>
+    <!-- Threat Intelligence Side Panel Drawer (Phase 8) -->
+    <div id="threat-intel-panel" class="intel-drawer" hidden>
+      <div class="intel-drawer-header">
+        <h3>Threat Intelligence Detail</h3>
+        <button id="close-intel-btn" class="close-btn">&times;</button>
+      </div>
+      <div class="intel-drawer-content">
+        <div class="intel-meta-group">
+          <span class="intel-label">Classification</span>
+          <span id="intel-classification" class="category-pill safe">Safe</span>
+        </div>
+        <div class="intel-meta-group">
+          <span class="intel-label">Risk Score</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span id="intel-risk-score" style="font-size: 24px; font-weight: bold; font-family: monospace;">0</span>
+            <span style="font-size: 14px; color: var(--muted);">/ 100</span>
+          </div>
+        </div>
+        <div class="intel-meta-group">
+          <span class="intel-label">Confidence</span>
+          <span id="intel-confidence" style="font-family: monospace; font-weight: bold;">0%</span>
+        </div>
+        
+        <hr style="border: 0; border-top: 1px solid rgba(72, 213, 255, 0.12); margin: 16px 0;" />
+        
+        <div class="intel-detail-item">
+          <span class="intel-label">Full URL</span>
+          <p id="intel-url" style="word-break: break-all; font-family: monospace; font-size: 13px; color: var(--text); background: rgba(3,11,21,0.5); padding: 8px; border-radius: 8px; border: 1px solid rgba(140,168,199,0.1);"></p>
+        </div>
+        <div class="intel-detail-item">
+          <span class="intel-label">Domain</span>
+          <p id="intel-domain" style="font-family: monospace; font-weight: bold; color: var(--accent);"></p>
+        </div>
+        <div class="intel-detail-item">
+          <span class="intel-label">Request Type</span>
+          <p id="intel-request-type" style="text-transform: uppercase; font-family: monospace; font-size: 13px;"></p>
+        </div>
+        <div class="intel-detail-item">
+          <span class="intel-label">Third Party</span>
+          <p id="intel-third-party" style="font-weight: bold;"></p>
+        </div>
+        <div class="intel-detail-item">
+          <span class="intel-label">Referrer</span>
+          <p id="intel-referrer" style="word-break: break-all; font-family: monospace; font-size: 13px;"></p>
+        </div>
+        <div class="intel-detail-item">
+          <span class="intel-label">Timestamp</span>
+          <p id="intel-timestamp" style="font-size: 13px; color: var(--muted);"></p>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid rgba(72, 213, 255, 0.12); margin: 16px 0;" />
+
+        <div class="intel-detail-item">
+          <span class="intel-label">Model Explanation</span>
+          <p id="intel-explanation" class="intel-explanation-box"></p>
+        </div>
+        
+        <div class="intel-detail-item">
+          <span class="intel-label">Top Contributing Features</span>
+          <div id="intel-top-features" style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/dashboard-assets/dashboard.js?v=1.1.0"></script>
   </body>
 </html>

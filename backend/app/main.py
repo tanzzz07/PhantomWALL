@@ -18,11 +18,23 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.settings = settings
     app.state.session_factory = AsyncSessionFactory
+
+    # 1. Auto-migrate: add any missing columns to existing tables
+    from app.services.auto_migrate import run_auto_migration
+    await run_auto_migration(engine)
+
+    # 2. Create any brand-new tables that don't exist yet
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
 
     app.state.analytics_service = AnalyticsService(max_recent_events=settings.max_recent_events)
     app.state.websocket_manager = WebSocketManager()
+
+    # Run database retention cleanup in background on startup
+    import asyncio
+    from app.services.retention import run_retention_cleanup
+    asyncio.create_task(run_retention_cleanup(engine))
+
     yield
     await engine.dispose()
 

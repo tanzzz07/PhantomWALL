@@ -58,7 +58,7 @@ async def run_integration_test():
             blocked=True,
             third_party=True
         )
-        stats_1 = await service.ingest_event(session, install, event_1)
+        stats_1, _ = await service.ingest_event(session, install, event_1)
         print("Ingested Event 1 (Analytics).")
         
         # Ingest tracker event (Advertising)
@@ -71,7 +71,7 @@ async def run_integration_test():
             blocked=True,
             third_party=True
         )
-        stats_2 = await service.ingest_event(session, install, event_2)
+        stats_2, _ = await service.ingest_event(session, install, event_2)
         print("Ingested Event 2 (Advertising).")
 
         # Ingest safe event (Safe)
@@ -84,7 +84,7 @@ async def run_integration_test():
             blocked=False,
             third_party=False
         )
-        stats_3 = await service.ingest_event(session, install, event_3)
+        stats_3, _ = await service.ingest_event(session, install, event_3)
         print("Ingested Event 3 (Safe).")
 
         # Verify classifications in recent events

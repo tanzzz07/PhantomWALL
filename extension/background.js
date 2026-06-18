@@ -6,8 +6,13 @@ const MONITORED_RESOURCE_TYPES = new Set([
   "script",
   "xmlhttprequest",
   "image",
+  "stylesheet",
+  "font",
+  "websocket",
+  "other",
   "ping",
   "sub_frame",
+  "main_frame"
 ]);
 
 const defaultState = {
@@ -188,30 +193,57 @@ async function handleObservedRequest(details) {
   }
 
   const trackerDomain = matchTrackerDomain(details.url);
-  if (!trackerDomain) {
-    return;
-  }
+  const isTracker = !!trackerDomain;
 
   const pageOrigin = details.initiator || details.documentUrl || "";
-  if (!isThirdPartyRequest(pageOrigin, details.url)) {
-    return;
+  const isThird = isThirdPartyRequest(pageOrigin, details.url);
+
+  const mapRequestType = (type) => {
+    const supported = ["script", "xmlhttprequest", "image", "stylesheet", "font", "websocket"];
+    const t = String(type).toLowerCase();
+    if (supported.includes(t)) {
+      return t;
+    }
+    return "other";
+  };
+
+  const normalizedType = mapRequestType(details.type);
+
+  let tabUrl = "";
+  if (details.tabId >= 0) {
+    try {
+      const tab = await chrome.tabs.get(details.tabId);
+      tabUrl = tab?.url || "";
+    } catch (err) {
+      // Tab might have closed or permissions missing
+    }
+  }
+
+  let domain = "";
+  try {
+    domain = new URL(details.url).hostname;
+  } catch (e) {
+    domain = trackerDomain || "unknown";
   }
 
   const event = {
-    tracker_domain: trackerDomain,
+    timestamp: new Date().toISOString(),
     url: details.url,
-    page_origin: pageOrigin || null,
-    request_type: details.type,
-    source: "extension",
-    blocked: true,
-    third_party: true,
-    occurred_at: new Date().toISOString(),
+    domain: domain,
+    request_type: normalizedType,
+    blocked: isTracker,
+    action: isTracker ? "blocked" : "observed",
+    tab_url: tabUrl || null,
+    referrer: pageOrigin || null,
+    third_party: isThird,
   };
 
-  analyticsState.blockedCount += 1;
-  analyticsState.trackerHits[trackerDomain] =
-    (analyticsState.trackerHits[trackerDomain] || 0) + 1;
-  analyticsState.lastUpdated = event.occurred_at;
+  if (isTracker) {
+    analyticsState.blockedCount += 1;
+    analyticsState.trackerHits[trackerDomain] =
+      (analyticsState.trackerHits[trackerDomain] || 0) + 1;
+  }
+  analyticsState.lastUpdated = event.timestamp;
 
   await updateBadge();
   await persistState();

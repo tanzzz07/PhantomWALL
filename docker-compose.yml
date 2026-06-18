@@ -34,6 +34,7 @@ services:
       PHANTOMWALL_ADMIN_PASSWORD: tanmay@E31
       PHANTOMWALL_JWT_SECRET_KEY: change-this-jwt-secret
       PHANTOMWALL_REGISTRATION_INVITE_CODE: phantomwall-invite
+      PORT: 8000
     ports:
       - "8000:8000"
     restart: unless-stopped

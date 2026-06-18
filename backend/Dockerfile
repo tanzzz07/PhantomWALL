@@ -2,6 +2,7 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 WORKDIR /app
 
@@ -13,6 +14,11 @@ RUN pip install --no-cache-dir --upgrade pip && \
 RUN mkdir -p /app/data && chmod 777 /app/data
 
 COPY app ./app
+COPY feature_engineering ./feature_engineering
+COPY inference ./inference
+COPY models ./models
+COPY training ./training
+COPY migrations ./migrations
 
 EXPOSE 7860
 

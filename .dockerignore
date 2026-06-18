@@ -11,3 +11,4 @@ backend/data/telemetry
 *.csv
 *.json
 *.md
+!backend/models/*.json

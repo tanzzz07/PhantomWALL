@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -95,4 +95,49 @@ class TrackerEventRecord(Base):
     )
 
     install: Mapped[Install] = relationship(back_populates="events")
+
+
+class BlockedRequest(Base):
+    __tablename__ = "blocked_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    full_url: Mapped[str] = mapped_column(Text, nullable=False)
+    domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    request_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    blocked: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    classification: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    risk_score: Mapped[int] = mapped_column(Integer, nullable=False)
+    third_party: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    tab_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    referrer: Mapped[str | None] = mapped_column(Text, nullable=True)
+    top_features: Mapped[str | None] = mapped_column(Text, nullable=True)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    user: Mapped["User | None"] = relationship()
+
+
+class DomainReputation(Base):
+    __tablename__ = "domain_reputation"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    domain: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    times_seen: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    times_blocked: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    average_risk_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    classification: Mapped[str] = mapped_column(String(64), nullable=False)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

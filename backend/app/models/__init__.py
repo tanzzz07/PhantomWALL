@@ -1,6 +1,6 @@
 """SQLAlchemy models for PhantomWall analytics."""
 
-from app.models.analytics import Install, TrackerEventRecord, User
+from app.models.analytics import BlockedRequest, DomainReputation, Install, TrackerEventRecord, User
 from app.models.base import Base
 
-__all__ = ["Base", "Install", "TrackerEventRecord", "User"]
+__all__ = ["Base", "BlockedRequest", "DomainReputation", "Install", "TrackerEventRecord", "User"]

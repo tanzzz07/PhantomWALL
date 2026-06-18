@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta, timezone
+import json
 
 from sqlalchemy import Integer, Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Install, TrackerEventRecord, User
+from app.models import Install, TrackerEventRecord, User, BlockedRequest, DomainReputation
 from app.schemas.analytics import (
     BlockedScriptRecord,
     DomainCount,
@@ -14,6 +15,9 @@ from app.schemas.analytics import (
     TrackEventIn,
 )
 from app.services.classifier import TrackerClassifier
+from feature_engineering.extractor import FeatureExtractor
+from inference.predictor import Predictor
+from app.services.explanation_service import ExplanationService
 
 
 class AnalyticsService:
@@ -27,40 +31,155 @@ class AnalyticsService:
         session: AsyncSession,
         install: Install,
         event: TrackEventIn,
-    ) -> StatsResponse:
+    ) -> tuple[StatsResponse, BlockedRequest]:
+        # Resolve domain, timestamp, referrer, and action from telemetry inputs (supporting old and new schemas)
+        domain = event.domain or event.tracker_domain or "unknown"
+        timestamp = event.timestamp or event.occurred_at or datetime.now(timezone.utc)
+        referrer = event.referrer or event.page_origin
+        action = event.action or ("blocked" if event.blocked else "observed")
+        request_type = event.request_type or "other"
+
         # Get count of events for this install and domain in the last 5 minutes (request frequency)
         time_limit = datetime.now(timezone.utc) - timedelta(minutes=5)
         count_query = select(func.count(TrackerEventRecord.id)).where(
             TrackerEventRecord.install_id == install.id,
-            TrackerEventRecord.tracker_domain == event.tracker_domain,
+            TrackerEventRecord.tracker_domain == domain,
             TrackerEventRecord.occurred_at >= time_limit
         )
         recent_count = await self._scalar_count(session, count_query)
 
-        # Classify the threat level of the event
-        classification = TrackerClassifier.classify(
-            domain=event.tracker_domain,
+        # Classify the threat level of the event using legacy fallback rules
+        legacy_classification = TrackerClassifier.classify(
+            domain=domain,
             url=event.url,
             recent_count=recent_count,
             is_third_party=event.third_party,
         )
+        class_map = {
+            "fingerprinting": "Fingerprinting",
+            "advertising": "Advertising",
+            "analytics": "Analytics",
+            "tracker": "Suspicious",
+            "safe": "Safe"
+        }
+        legacy_classification_cap = class_map.get(legacy_classification.lower(), "Safe")
 
+        # Save standard TrackerEventRecord for backwards compatibility
         record = TrackerEventRecord(
             install_id=install.id,
-            tracker_domain=event.tracker_domain,
+            tracker_domain=domain,
             url=event.url,
-            page_origin=event.page_origin,
-            request_type=event.request_type,
+            page_origin=referrer,
+            request_type=request_type,
             source=event.source,
             blocked=event.blocked,
             third_party=event.third_party,
-            classification=classification,
-            occurred_at=event.occurred_at,
+            classification=legacy_classification_cap,
+            occurred_at=timestamp,
         )
         install.last_seen_at = datetime.now(timezone.utc)
         session.add(record)
+
+        # --- NEW TELEMETRY PIPELINE ---
+        # 1. Feature extraction
+        raw_features = FeatureExtractor.extract_features(
+            url=event.url,
+            request_type=request_type,
+            third_party=event.third_party,
+            request_frequency=recent_count + 1,
+            referrer_domain=referrer or "",
+            session_occurrence_count=recent_count + 1
+        )
+
+        # 2. Predict using final XGBoost classifier model
+        predictor = Predictor()
+        prediction_result = None
+        if predictor.model_loaded:
+            prediction_result = predictor.predict(
+                url=event.url,
+                request_type=request_type,
+                third_party=event.third_party,
+                request_frequency=recent_count + 1,
+                referrer_domain=referrer or ""
+            )
+
+        if prediction_result:
+            classification = prediction_result["prediction"]
+            confidence = prediction_result["confidence"]
+        else:
+            classification = legacy_classification_cap
+            confidence = 1.0
+
+        # 3. Calculate dynamic risk score (0-100)
+        # risk_score = category_weight * confidence * 100
+        category_weights = {
+            "Safe": 0.1,
+            "Analytics": 0.4,
+            "Advertising": 0.6,
+            "Fingerprinting": 0.85,
+            "Suspicious": 1.0
+        }
+        weight = category_weights.get(classification, 0.1)
+        risk_score = int(round(weight * confidence * 100))
+
+        # 4. Generate SHAP explanations
+        top_feats, explanation_text = ExplanationService.generate_explanation(
+            raw_features=raw_features,
+            classification=classification,
+            confidence=confidence
+        )
+        top_features_json = json.dumps(top_feats)
+
+        # 5. Persist BlockedRequest (handles both observed and blocked)
+        blocked_record = BlockedRequest(
+            user_id=install.user_id,
+            timestamp=timestamp,
+            full_url=event.url,
+            domain=domain,
+            request_type=request_type,
+            blocked=event.blocked,
+            action=action,
+            classification=classification,
+            confidence=confidence,
+            risk_score=risk_score,
+            third_party=event.third_party,
+            tab_url=event.tab_url,
+            referrer=referrer,
+            top_features=top_features_json,
+            explanation=explanation_text
+        )
+        session.add(blocked_record)
+
+        # 6. Update Domain Reputation Engine
+        rep_query = select(DomainReputation).where(DomainReputation.domain == domain)
+        rep_result = await session.execute(rep_query)
+        reputation = rep_result.scalar_one_or_none()
+
+        if reputation:
+            reputation.times_seen += 1
+            if event.blocked:
+                reputation.times_blocked += 1
+            # Recalculate average risk score
+            reputation.average_risk_score = (
+                (reputation.average_risk_score * (reputation.times_seen - 1) + risk_score)
+                / reputation.times_seen
+            )
+            reputation.classification = classification
+            reputation.last_seen = timestamp
+        else:
+            reputation = DomainReputation(
+                domain=domain,
+                times_seen=1,
+                times_blocked=1 if event.blocked else 0,
+                average_risk_score=float(risk_score),
+                classification=classification,
+                first_seen=timestamp,
+                last_seen=timestamp
+            )
+            session.add(reputation)
+
         await session.commit()
-        return await self.get_stats(session=session)
+        return await self.get_stats(session=session), blocked_record
 
     async def get_stats(
         self,
@@ -351,3 +470,226 @@ class AnalyticsService:
     async def _scalar_count(self, session: AsyncSession, query: Select) -> int:
         result = await session.execute(query)
         return int(result.scalar() or 0)
+
+    async def get_history(
+        self,
+        session: AsyncSession,
+        user_id: str | None = None,
+        page: int = 1,
+        limit: int = 50,
+        classification: str | None = None,
+        request_type: str | None = None,
+        search: str | None = None
+    ) -> dict:
+        query = select(BlockedRequest)
+        filters = []
+
+        if user_id:
+            filters.append(BlockedRequest.user_id == user_id)
+        if classification:
+            filters.append(BlockedRequest.classification == classification)
+        if request_type:
+            filters.append(BlockedRequest.request_type == request_type)
+        if search:
+            filters.append(
+                (BlockedRequest.domain.ilike(f"%{search}%")) |
+                (BlockedRequest.full_url.ilike(f"%{search}%"))
+            )
+
+        if filters:
+            query = query.where(*filters)
+
+        count_query = select(func.count(BlockedRequest.id))
+        if filters:
+            count_query = count_query.where(*filters)
+        total = await self._scalar_count(session, count_query)
+
+        query = query.order_by(BlockedRequest.timestamp.desc(), BlockedRequest.id.desc())
+        offset = (page - 1) * limit
+        query = query.offset(offset).limit(limit)
+
+        result = await session.execute(query)
+        records = result.scalars().all()
+
+        items = []
+        for record in records:
+            top_feats = []
+            if record.top_features:
+                try:
+                    top_feats = json.loads(record.top_features)
+                except Exception:
+                    top_feats = []
+            items.append({
+                "id": record.id,
+                "timestamp": record.timestamp,
+                "full_url": record.full_url,
+                "domain": record.domain,
+                "request_type": record.request_type,
+                "blocked": record.blocked,
+                "action": record.action,
+                "classification": record.classification,
+                "confidence": record.confidence,
+                "risk_score": record.risk_score,
+                "third_party": record.third_party,
+                "tab_url": record.tab_url,
+                "referrer": record.referrer,
+                "top_features": top_feats,
+                "explanation": record.explanation
+            })
+
+        import math
+        pages = math.ceil(total / limit) if limit > 0 else 1
+
+        return {
+            "items": items,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "pages": pages
+        }
+
+    async def get_history_stats(
+        self,
+        session: AsyncSession,
+        user_id: str | None = None
+    ) -> dict:
+        filters = []
+        if user_id:
+            filters.append(BlockedRequest.user_id == user_id)
+
+        total_query = select(func.count(BlockedRequest.id))
+        if filters:
+            total_query = total_query.where(*filters)
+        total_requests = await self._scalar_count(session, total_query)
+
+        blocked_q = select(func.count(BlockedRequest.id)).where(BlockedRequest.blocked.is_(True))
+        if filters:
+            blocked_q = blocked_q.where(*filters)
+        blocked_count = await self._scalar_count(session, blocked_q)
+
+        observed_q = select(func.count(BlockedRequest.id)).where(BlockedRequest.blocked.is_(False))
+        if filters:
+            observed_q = observed_q.where(*filters)
+        observed_count = await self._scalar_count(session, observed_q)
+
+        avg_risk_q = select(func.coalesce(func.avg(BlockedRequest.risk_score), 0.0))
+        if filters:
+            avg_risk_q = avg_risk_q.where(*filters)
+        avg_risk_res = await session.execute(avg_risk_q)
+        average_risk_score = float(avg_risk_res.scalar() or 0.0)
+
+        script_query = select(func.count(BlockedRequest.id)).where(
+            BlockedRequest.request_type == "script",
+            BlockedRequest.blocked.is_(True)
+        )
+        if filters:
+            script_query = script_query.where(*filters)
+        blocked_scripts = await self._scalar_count(session, script_query)
+
+        classifications = ["Analytics", "Advertising", "Fingerprinting", "Suspicious"]
+        class_counts = {}
+        for cls in classifications:
+            cls_query = select(func.count(BlockedRequest.id)).where(BlockedRequest.classification == cls)
+            if filters:
+                cls_query = cls_query.where(*filters)
+            class_counts[cls.lower()] = await self._scalar_count(session, cls_query)
+
+        if session.bind.dialect.name == "postgresql":
+            date_expr = func.to_char(BlockedRequest.timestamp, "YYYY-MM-DD")
+        else:
+            date_expr = func.strftime("%Y-%m-%d", BlockedRequest.timestamp)
+
+        over_time_query = select(
+            date_expr.label("date"),
+            func.count(BlockedRequest.id).label("count")
+        )
+        if filters:
+            over_time_query = over_time_query.where(*filters)
+        over_time_query = over_time_query.group_by("date").order_by("date")
+
+        over_time_res = await session.execute(over_time_query)
+        over_time = [{"date": row[0], "count": row[1]} for row in over_time_res.all()]
+
+        type_query = select(
+            BlockedRequest.request_type.label("type"),
+            func.count(BlockedRequest.id).label("count")
+        )
+        if filters:
+            type_query = type_query.where(*filters)
+        type_query = type_query.group_by(BlockedRequest.request_type).order_by(func.count(BlockedRequest.id).desc())
+        type_res = await session.execute(type_query)
+        request_types = [{"type": row[0], "count": row[1]} for row in type_res.all()]
+
+        risk_query = select(
+            BlockedRequest.risk_score.label("risk_score"),
+            func.count(BlockedRequest.id).label("count")
+        )
+        if filters:
+            risk_query = risk_query.where(*filters)
+        risk_query = risk_query.group_by(BlockedRequest.risk_score).order_by(BlockedRequest.risk_score)
+        risk_res = await session.execute(risk_query)
+        risk_distribution = [{"risk_score": row[0], "count": row[1]} for row in risk_res.all()]
+
+        return {
+            "total_requests": total_requests,
+            "blocked_count": blocked_count,
+            "observed_count": observed_count,
+            "average_risk_score": average_risk_score,
+            "blocked_scripts": blocked_scripts,
+            "analytics": class_counts["analytics"],
+            "advertising": class_counts["advertising"],
+            "fingerprinting": class_counts["fingerprinting"],
+            "suspicious": class_counts["suspicious"],
+            "over_time": over_time,
+            "request_types": request_types,
+            "risk_distribution": risk_distribution
+        }
+
+    async def get_history_top_domains(
+        self,
+        session: AsyncSession,
+        user_id: str | None = None,
+        limit: int = 5
+    ) -> list[dict]:
+        filters = [BlockedRequest.blocked.is_(True)]
+        if user_id:
+            filters.append(BlockedRequest.user_id == user_id)
+
+        query = select(
+            BlockedRequest.domain,
+            func.count(BlockedRequest.id).label("count")
+        ).where(*filters).group_by(BlockedRequest.domain).order_by(func.count(BlockedRequest.id).desc()).limit(limit)
+
+        result = await session.execute(query)
+        return [{"domain": row[0], "count": row[1]} for row in result.all()]
+
+    async def get_reputation(
+        self,
+        session: AsyncSession,
+        limit: int = 50,
+        offset: int = 0
+    ) -> list[DomainReputation]:
+        query = select(DomainReputation).order_by(DomainReputation.domain).offset(offset).limit(limit)
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_reputation_top_risk(
+        self,
+        session: AsyncSession,
+        limit: int = 5
+    ) -> list[DomainReputation]:
+        query = select(DomainReputation).order_by(
+            DomainReputation.average_risk_score.desc(),
+            DomainReputation.times_blocked.desc()
+        ).limit(limit)
+        result = await session.execute(query)
+        return list(result.scalars().all())
+
+    async def get_reputation_by_domain(
+        self,
+        session: AsyncSession,
+        domain: str
+    ) -> DomainReputation | None:
+        query = select(DomainReputation).where(DomainReputation.domain == domain)
+        result = await session.execute(query)
+        return result.scalar_one_or_none()

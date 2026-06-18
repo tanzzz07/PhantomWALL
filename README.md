@@ -10,16 +10,24 @@ pinned: false
 
 # PhantomWall
 
-PhantomWall is a distributed browser privacy defense system built with a Chrome Manifest V3 extension and a FastAPI backend. This version supports hosted multi-user analytics: each browser install can register with your backend, send authenticated tracker events, and appear in a central admin dashboard.
+PhantomWall is a distributed browser privacy defense system built with a Chrome Manifest V3 extension and a FastAPI backend. This version supports hosted multi-user analytics: each browser install can register with your backend, send authenticated tracker events, and appear in a central admin dashboard with full script block history and threat intelligence.
 
 ## Features
 
 - Chrome MV3 extension with `declarativeNetRequest` tracker blocking
 - Local extension analytics for offline-first behavior
 - Options page for remote backend setup and install registration
-- Authenticated install telemetry via per-install API tokens
+- Authenticated install telemetry via per-install API tokens (both **blocked** and **observed** requests)
 - FastAPI backend with PostgreSQL and SQLite support
-- ML-Based Tracker Classification (classifying events into Fingerprinting, Advertising, Analytics, Tracker, or Safe based on entropy, URL patterns, frequency, and third-party behavior)
+- ML-Based Tracker Classification using XGBoost (classifying events into Fingerprinting, Advertising, Analytics, Suspicious, or Safe based on entropy, URL patterns, frequency, and third-party behavior)
+- **Script Block History** — full paginated, searchable, filterable log of every classified request with drill-down detail drawers
+- **Threat Intelligence Dashboard** — interactive Chart.js visualizations (threat distribution, blocked over time, risk score distribution, top domains, request types)
+- **Domain Reputation Engine** — aggregated per-domain risk scores, block counts, and classification tracking
+- **Explainable AI (XAI)** — SHAP-based feature importance with rule-based heuristic fallback for human-readable model decision summaries
+- **Dynamic Risk Scoring** — per-request risk scores (0–100) computed as `category_weight × confidence × 100`
+- **Auto-Migration** — lightweight startup schema migration that adds missing columns to existing PostgreSQL tables without Alembic
+- **30-Day Data Retention** — automatic cleanup of raw telemetry logs on startup, preserving domain reputation aggregates
+- Multi-user dashboard with registration, per-user scoped data, and admin/user JWT roles
 - Admin login for the hosted analytics dashboard with classification breakdowns
 - Real-time dashboard refresh through WebSockets
 - Dockerized backend and database stack
@@ -33,22 +41,42 @@ PhantomWall is a distributed browser privacy defense system built with a Chrome 
 |   |-- app/
 |   |   |-- api/
 |   |   |   `-- routes/
+|   |   |       |-- analytics.py      # Stats, history, reputation, track-event endpoints
+|   |   |       |-- auth.py           # Login, register, /auth/me
+|   |   |       |-- installs.py       # Install registration and listing
+|   |   |       `-- live.py           # WebSocket live stream
 |   |   |-- core/
+|   |   |   |-- config.py             # Pydantic settings
+|   |   |   |-- dependencies.py       # FastAPI dependency injection
+|   |   |   `-- security.py           # PBKDF2 password hashing
 |   |   |-- models/
+|   |   |   `-- analytics.py          # User, Install, TrackerEventRecord, BlockedRequest, DomainReputation
 |   |   |-- schemas/
 |   |   |-- services/
+|   |   |   |-- analytics.py          # Core analytics queries and ingestion pipeline
+|   |   |   |-- auto_migrate.py       # Startup schema migration utility
+|   |   |   |-- classifier.py         # Legacy rule-based classifier
+|   |   |   |-- explanation_service.py # SHAP / heuristic XAI explanations
+|   |   |   |-- retention.py          # 30-day data retention cleanup
+|   |   |   `-- websocket_manager.py  # WebSocket broadcast manager
 |   |   `-- static/
+|   |       |-- dashboard.html
+|   |       |-- dashboard.js
+|   |       `-- dashboard.css
+|   |-- feature_engineering/          # URL feature extraction pipeline
+|   |-- inference/                    # XGBoost model prediction service
+|   |-- models/                       # Trained ML model artifacts (.pkl, .json)
+|   |-- training/                     # Model training pipeline
+|   |-- migrations/                   # Raw SQL migration scripts
+|   |-- tests/                        # Pytest test suite
 |   |-- Dockerfile
 |   `-- requirements.txt
 |-- extension/
-|   |-- background.js
+|   |-- background.js                 # MV3 service worker with telemetry pipeline
 |   |-- manifest.json
-|   |-- options.html
-|   |-- options.js
-|   |-- options.css
-|   |-- popup.html
-|   |-- popup.js
-|   |-- rules.json
+|   |-- options.html / options.js
+|   |-- popup.html / popup.js
+|   |-- rules.json                    # declarativeNetRequest tracker rules
 |   `-- styles.css
 `-- docker-compose.yml
 ```
@@ -60,6 +88,7 @@ PhantomWall is a distributed browser privacy defense system built with a Chrome 
 - Intercepts outgoing requests in `background.js`
 - Detects third-party tracker requests against `rules.json`
 - Blocks matching requests through `declarativeNetRequest`
+- Captures metadata for both **blocked** and **observed** requests (URL, domain, request type, tab URL, referrer, third-party flag)
 - Stores local counts in `chrome.storage.local`
 - Lets each user register the install from `options.html`
 - Sends authenticated tracker events with `X-PhantomWall-Install-Token`
@@ -67,10 +96,17 @@ PhantomWall is a distributed browser privacy defense system built with a Chrome 
 ### Backend
 
 - `POST /installs/register` creates a new install identity from an invite code
-- `POST /track-event` ingests telemetry from a registered extension
-- `POST /auth/login` issues an admin dashboard token
-- `GET /stats` returns aggregated or per-install analytics
-- `GET /installs` lists all registered installs
+- `POST /track-event` ingests telemetry, runs ML classification, computes risk scores, generates XAI explanations, and updates domain reputation
+- `POST /auth/login` issues a JWT dashboard token (admin or user scope)
+- `POST /auth/register` creates a new dashboard user account
+- `GET /stats` returns aggregated or per-install analytics (scoped by user for non-admins)
+- `GET /installs` lists registered installs
+- `GET /history` returns paginated, filterable script block history with classification, confidence, and risk scores
+- `GET /history/stats` returns aggregated threat distribution, timeline series, request type breakdown, and risk distribution
+- `GET /history/top-domains` returns top blocked domains by count
+- `GET /reputation` returns domain reputation records
+- `GET /reputation/top-risk` returns highest-risk domains
+- `POST /admin/cleanup` triggers manual 30-day retention cleanup (admin-only)
 - `GET /dashboard` serves the protected admin dashboard shell
 - `WS /ws/live` streams authenticated dashboard update signals
 
@@ -252,7 +288,7 @@ The extension ships with sample rules for:
 
 ## ML-Based Tracker Classification
 
-PhantomWall features a pure-Python **Multinomial Logistic Regression (Linear Softmax) Classifier** in the backend that runs on each incoming telemetry event. The classifier scores events using 9 extracted features:
+PhantomWall features a production **XGBoost Gradient Boosted Tree Classifier** (with Logistic Regression and Random Forest fallbacks) that runs on each incoming telemetry event. The classifier scores events using 9 extracted features:
 
 1.  **Domain Entropy:** Shannon entropy of the domain name to detect random/algorithmically generated tracking subdomains.
 2.  **URL Length:** Length of the request URL (scaled).
@@ -264,7 +300,32 @@ PhantomWall features a pure-Python **Multinomial Logistic Regression (Linear Sof
 8.  **Analytics Keywords:** Presence of analytics vectors (e.g. `telemetry`, `ga.js`, `stats`).
 9.  **General Tracker Keywords:** Presence of general tracking terms (e.g. `track`, `collect`, `log`).
 
-Classification outputs one of: `Fingerprinting` (Orange), `Advertising` (Red), `Analytics` (Blue), `Tracker` (Purple), or `Safe` (Green), rendered with high-contrast pills in the admin dashboard.
+Classification outputs one of: `Fingerprinting` (Orange), `Advertising` (Red), `Analytics` (Blue), `Suspicious` (Purple), or `Safe` (Green), rendered with high-contrast pills in the admin dashboard.
+
+### Dynamic Risk Scoring
+
+Each classified request receives a risk score (0–100) calculated as:
+
+```
+risk_score = category_weight × confidence × 100
+```
+
+Category weights: Safe (0.1), Analytics (0.4), Advertising (0.6), Fingerprinting (0.85), Suspicious (1.0).
+
+### Explainable AI (XAI)
+
+Every prediction includes a human-readable explanation generated by:
+1.  **SHAP TreeExplainer** (when the `shap` package is available)
+2.  **Rule-based heuristic fallback** that inspects feature values and identifies the top contributing indicators
+
+Explanations are visible in the Threat Intelligence Detail drawer on the dashboard.
+
+### Domain Reputation Engine
+
+The backend maintains a `domain_reputation` table that aggregates per-domain statistics across all telemetry:
+- Total times seen, times blocked
+- Running average risk score
+- Current classification and first/last seen timestamps
 
 ---
 
@@ -300,6 +361,6 @@ Whenever you push code changes to the `main` branch on GitHub, the pipeline runs
 - Put the backend behind HTTPS before sharing it
 - Rotate the invite code and admin secrets before public rollout
 - Consider minimizing or anonymizing stored page-level data if privacy requirements tighten
-- Add database migrations before long-term production use
-
-
+- The auto-migration utility handles column additions automatically; for destructive schema changes, use manual SQL migrations in `backend/migrations/`
+- Raw telemetry is automatically purged after 30 days; domain reputation aggregates are preserved indefinitely
+- The ML model artifacts in `backend/models/` are required for inference; retrain with the training pipeline if the feature schema changes

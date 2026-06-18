@@ -396,15 +396,15 @@ h1 {
 }
 
 .category-pill.fingerprinting {
-  color: var(--warning);
-  background: rgba(255, 201, 91, 0.12);
-  border: 1px solid rgba(255, 201, 91, 0.22);
+  color: #a55eea;
+  background: rgba(165, 94, 234, 0.12);
+  border: 1px solid rgba(165, 94, 234, 0.22);
 }
 
 .category-pill.advertising {
-  color: var(--danger);
-  background: rgba(255, 99, 126, 0.12);
-  border: 1px solid rgba(255, 99, 126, 0.22);
+  color: #ff9f43;
+  background: rgba(255, 159, 67, 0.12);
+  border: 1px solid rgba(255, 159, 67, 0.22);
 }
 
 .category-pill.analytics {
@@ -414,17 +414,16 @@ h1 {
 }
 
 .category-pill.tracker {
-  color: #c98eff;
-  background: rgba(201, 142, 255, 0.12);
-  border: 1px solid rgba(201, 142, 255, 0.22);
+  color: #a55eea;
+  background: rgba(165, 94, 234, 0.12);
+  border: 1px solid rgba(165, 94, 234, 0.22);
 }
 
 .category-pill.suspicious {
-  color: #c98eff;
-  background: rgba(201, 142, 255, 0.12);
-  border: 1px solid rgba(201, 142, 255, 0.22);
+  color: var(--danger);
+  background: rgba(255, 99, 126, 0.12);
+  border: 1px solid rgba(255, 99, 126, 0.22);
 }
-
 
 .category-pill.safe {
   color: var(--accent-2);
@@ -520,6 +519,97 @@ h1 {
 
 [hidden] {
   display: none !important;
+}
+
+/* Intel side drawer */
+.intel-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(450px, 100vw);
+  height: 100vh;
+  background: rgba(7, 18, 34, 0.96);
+  border-left: 1px solid var(--panel-border);
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(24px);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.intel-drawer-header {
+  padding: 24px;
+  border-bottom: 1px solid rgba(72, 213, 255, 0.12);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.intel-drawer-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 28px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--text);
+}
+
+.intel-drawer-content {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.intel-meta-group {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.intel-label {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 10px;
+  color: var(--accent);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.intel-detail-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.intel-explanation-box {
+  background: rgba(0, 211, 255, 0.05);
+  border-left: 4px solid var(--accent);
+  padding: 12px;
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clickable-row:hover {
+  background-color: rgba(72, 213, 255, 0.05);
 }
 
 

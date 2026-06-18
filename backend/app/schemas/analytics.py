@@ -1,19 +1,84 @@
 from datetime import datetime, timezone
-
 from pydantic import BaseModel, Field
 
-
 class TrackEventIn(BaseModel):
-    tracker_domain: str
+    # New MV3 telemetry schema fields
+    timestamp: datetime | None = None
     url: str
-    page_origin: str | None = None
+    domain: str | None = None
     request_type: str | None = None
-    source: str = "extension"
     blocked: bool = True
+    action: str | None = None
+    tab_url: str | None = None
+    referrer: str | None = None
     third_party: bool = True
-    occurred_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+
+    # Legacy telemetry compatibility fields
+    tracker_domain: str | None = None
+    page_origin: str | None = None
+    source: str = "extension"
+    occurred_at: datetime | None = None
+
+
+class BlockedRequestSchema(BaseModel):
+    id: int
+    timestamp: datetime
+    full_url: str
+    domain: str
+    request_type: str
+    blocked: bool
+    action: str
+    classification: str
+    confidence: float
+    risk_score: int
+    third_party: bool
+    tab_url: str | None = None
+    referrer: str | None = None
+    top_features: list[str] | None = None
+    explanation: str | None = None
+
+
+class HistoryResponse(BaseModel):
+    items: list[BlockedRequestSchema]
+    total: int
+    page: int
+    limit: int
+    pages: int
+
+
+class HistoryStatsResponse(BaseModel):
+    total_requests: int
+    blocked_count: int
+    observed_count: int
+    average_risk_score: float
+    blocked_scripts: int
+    analytics: int
+    advertising: int
+    fingerprinting: int
+    suspicious: int
+    over_time: list[dict]
+    request_types: list[dict]
+    risk_distribution: list[dict]
+
+
+class TopDomainReputationSchema(BaseModel):
+    domain: str
+    classification: str
+    times_seen: int
+    times_blocked: int
+    average_risk_score: float
+    last_seen: datetime
+
+
+class DomainReputationSchema(BaseModel):
+    id: int
+    domain: str
+    times_seen: int
+    times_blocked: int
+    average_risk_score: float
+    classification: str
+    first_seen: datetime
+    last_seen: datetime
 
 
 class DomainCount(BaseModel):
