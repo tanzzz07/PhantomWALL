@@ -138,10 +138,9 @@ def parse_tranco_list(file_path: Path) -> set:
 def generate_mock_data():
     """Generate high-quality synthetic/mock tracking and safe domain datasets for offline execution."""
     logger.info("Generating robust mock datasets for offline execution...")
-    PROCESSED_DIR.mkdir(
-    parents=True,
-    exist_ok=True
-)
+    print("BACKEND_DIR =", BACKEND_DIR)
+    print("PROCESSED_DIR =", PROCESSED_DIR)
+    print("EXISTS =", PROCESSED_DIR.exists()
 
 
     
