@@ -9,8 +9,19 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
-PROCESSED_DIR = Path(__file__).resolve().parent.parent / "data" / "processed"
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+RAW_DIR = BACKEND_DIR / "data" / "raw"
+PROCESSED_DIR = BACKEND_DIR / "data" / "processed"
+FINAL_DIR = BACKEND_DIR / "data" / "final"
+MODELS_DIR = BACKEND_DIR / "models"
+REPORTS_DIR = BACKEND_DIR / "reports"
+
+# Ensure all required pipeline directories exist before any file operations
+RAW_DIR.mkdir(parents=True, exist_ok=True)
+PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+FINAL_DIR.mkdir(parents=True, exist_ok=True)
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
+REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # URL constants
 EASYLIST_URL = "https://easylist.to/easylist/easylist.txt"
@@ -23,6 +34,9 @@ def ensure_dirs():
     """Ensure directory structure exists."""
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    FINAL_DIR.mkdir(parents=True, exist_ok=True)
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def download_file(url: str, filename: str) -> Path:
@@ -124,6 +138,12 @@ def parse_tranco_list(file_path: Path) -> set:
 def generate_mock_data():
     """Generate high-quality synthetic/mock tracking and safe domain datasets for offline execution."""
     logger.info("Generating robust mock datasets for offline execution...")
+    PROCESSED_DIR.mkdir(
+    parents=True,
+    exist_ok=True
+)
+
+
     
     mock_safe = [
         "google.com", "youtube.com", "facebook.com", "wikipedia.org", "yahoo.com", "amazon.com",
@@ -181,6 +201,7 @@ def generate_mock_data():
         processed_data.append({"url": f"https://{domain}/ping?token=xyz", "domain": domain, "label": "suspicious", "request_type": "other", "third_party": 1})
 
     # Save to intermediate JSON
+
     with open(PROCESSED_DIR / "intermediate_domains.json", "w", encoding="utf-8") as f:
         json.dump(processed_data, f, indent=2)
     logger.info(f"Saved {len(processed_data)} mock samples to {PROCESSED_DIR / 'intermediate_domains.json'}")

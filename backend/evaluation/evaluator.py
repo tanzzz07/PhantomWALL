@@ -6,6 +6,7 @@ import logging
 import joblib
 import shutil
 from pathlib import Path
+from datetime import datetime, timezone
 import pandas as pd
 import numpy as np
 
@@ -142,7 +143,7 @@ def run_evaluation():
         "macro_f1": float(comparison_results[best_model_name]["f1_macro"]),
         "accuracy": float(comparison_results[best_model_name]["accuracy"]),
         "inference_time_ms": float(comparison_results[best_model_name]["inference_time_ms"]),
-        "timestamp": datetime.now(timezone.utc).isoformat() if 'datetime' in locals() else time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
     with open(MODELS_DIR / "model_metadata.json", "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2)
