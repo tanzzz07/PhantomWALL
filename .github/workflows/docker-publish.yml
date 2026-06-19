@@ -44,6 +44,24 @@ jobs:
         run: |
           bandit -r backend/app backend/dataset_pipeline backend/feature_engineering \
             backend/training backend/evaluation backend/inference -ll || echo "Bandit warnings found"
+        
+      - name: Debug filesystem
+        run: |
+          pwd
+          ls -la
+          ls -la backend || true
+          ls -la backend/data || true
+
+      - name: Debug collector paths
+        env:
+          PYTHONPATH: backend
+        run: |
+          python -c "
+          from dataset_pipeline.collector import BACKEND_DIR, PROCESSED_DIR
+          print('BACKEND_DIR=', BACKEND_DIR)
+          print('PROCESSED_DIR=', PROCESSED_DIR)
+          print('EXISTS=', PROCESSED_DIR.exists())    
+          "
 
       - name: Run Unit Tests with Pytest
         env:

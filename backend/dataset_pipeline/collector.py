@@ -142,6 +142,9 @@ def generate_mock_data():
     print("PROCESSED_DIR =", PROCESSED_DIR)
     print("EXISTS =", PROCESSED_DIR.exists())
 
+    print("BACKEND_DIR =", BACKEND_DIR)
+    print("PROCESSED_DIR =", PROCESSED_DIR)
+    print("EXISTS =", PROCESSED_DIR.exists())
 
     
     mock_safe = [
