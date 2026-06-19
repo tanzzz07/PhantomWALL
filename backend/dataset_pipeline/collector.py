@@ -140,7 +140,7 @@ def generate_mock_data():
     logger.info("Generating robust mock datasets for offline execution...")
     print("BACKEND_DIR =", BACKEND_DIR)
     print("PROCESSED_DIR =", PROCESSED_DIR)
-    print("EXISTS =", PROCESSED_DIR.exists()
+    print("EXISTS =", PROCESSED_DIR.exists())
 
 
     
