@@ -71,6 +71,7 @@ jobs:
       - name: Validate ML Training Pipeline
         env:
           PYTHONPATH: backend
+          CI: true
         run: |
           python backend/dataset_pipeline/collector.py
           python backend/dataset_pipeline/telemetry_dataset_builder.py

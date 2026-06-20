@@ -12,6 +12,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
+CI_MODE = os.getenv("CI", "false").lower() == "true"
 
 # Resolve path for backend imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -95,9 +96,9 @@ def train_models():
     # 2. Random Forest with GridSearchCV
     logger.info("Tuning Random Forest via GridSearchCV...")
     rf_param_grid = {
-        "n_estimators": [50, 100],
-        "max_depth": [5, 10, None],
-        "min_samples_split": [2, 5]
+        "n_estimators": [100],
+        "max_depth": [10],
+        "min_samples_split": [2]
     }
     rf = RandomForestClassifier(random_state=42)
     rf_grid = GridSearchCV(rf, rf_param_grid, cv=cv, scoring="f1_macro", n_jobs=-1)
@@ -108,11 +109,11 @@ def train_models():
     # 3. XGBoost with GridSearchCV
     logger.info("Tuning XGBoost via GridSearchCV...")
     xgb_param_grid = {
-        "learning_rate": [0.05, 0.1],
-        "max_depth": [3, 5, 8],
-        "subsample": [0.8, 1.0],
-        "n_estimators": [50, 100],
-        "colsample_bytree": [0.8, 1.0]
+        "learning_rate": [0.1],
+    "max_depth": [5],
+    "subsample": [0.8],
+    "n_estimators": [100],
+    "colsample_bytree": [0.8]
     }
     # For newer xgboost versions, objective should be multi:softprob or multi:softmax
     xgb_clf = xgb.XGBClassifier(objective="multi:softprob", random_state=42, eval_metric="mlogloss")
