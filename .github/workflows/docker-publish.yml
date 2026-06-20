@@ -68,16 +68,47 @@ jobs:
           PYTHONPATH: backend
         run: pytest backend/tests/ -v
 
-      - name: Validate ML Training Pipeline
+      - name: Dataset Collection
         env:
           PYTHONPATH: backend
           CI: true
         run: |
           python backend/dataset_pipeline/collector.py
+
+      - name: Telemetry Dataset Builder
+        env:
+          PYTHONPATH: backend
+          CI: true
+        run: |
           python backend/dataset_pipeline/telemetry_dataset_builder.py
+
+      - name: Feature Engineering
+        env:
+          PYTHONPATH: backend
+          CI: true
+        run: |
           python backend/feature_engineering/extractor.py
+
+      - name: Model Training
+        env:
+          PYTHONPATH: backend
+          CI: true
+        run: |
           python backend/training/trainer.py
+
+      - name: Model Evaluation
+        env:
+          PYTHONPATH: backend
+          CI: true
+        run: |
           python backend/evaluation/evaluator.py
+
+      - name: SHAP Explainability
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PYTHONPATH: backend
+          CI: true
+        run: |
           python backend/evaluation/shap_analysis.py
 
 

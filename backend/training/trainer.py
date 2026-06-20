@@ -7,13 +7,11 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from sklearn.model_selection import train_test_split, StratifiedKFold, GridSearchCV
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 import xgboost as xgb
-CI_MODE = os.getenv("CI", "false").lower() == "true"
-
 # Resolve path for backend imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -85,44 +83,49 @@ def train_models():
     )
     logger.info(f"Train set shape: {X_train.shape}, Test set shape: {X_test.shape}")
     
-    # Cross validation setting
-    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    
     # 1. Logistic Regression
     logger.info("Training Logistic Regression...")
-    lr = LogisticRegression(max_iter=1000, random_state=42)
+
+    lr = LogisticRegression(
+        max_iter=3000,
+        random_state=42
+    )
+
     lr.fit(X_train, y_train)
-    
-    # 2. Random Forest with GridSearchCV
-    logger.info("Tuning Random Forest via GridSearchCV...")
-    rf_param_grid = {
-        "n_estimators": [100],
-        "max_depth": [10],
-        "min_samples_split": [2]
-    }
-    rf = RandomForestClassifier(random_state=42)
-    rf_grid = GridSearchCV(rf, rf_param_grid, cv=cv, scoring="f1_macro", n_jobs=-1)
-    rf_grid.fit(X_train, y_train)
-    best_rf = rf_grid.best_estimator_
-    logger.info(f"Best RF Params: {rf_grid.best_params_}")
-    
-    # 3. XGBoost with GridSearchCV
-    logger.info("Tuning XGBoost via GridSearchCV...")
-    xgb_param_grid = {
-        "learning_rate": [0.1],
-    "max_depth": [5],
-    "subsample": [0.8],
-    "n_estimators": [100],
-    "colsample_bytree": [0.8]
-    }
-    # For newer xgboost versions, objective should be multi:softprob or multi:softmax
-    xgb_clf = xgb.XGBClassifier(objective="multi:softprob", random_state=42, eval_metric="mlogloss")
-    xgb_grid = GridSearchCV(xgb_clf, xgb_param_grid, cv=cv, scoring="f1_macro", n_jobs=-1)
-    xgb_grid.fit(X_train, y_train)
-    best_xgb = xgb_grid.best_estimator_
-    logger.info(f"Best XGB Params: {xgb_grid.best_params_}")
-    
-    # Save the models temporarily for evaluation step
+
+    # 2. Random Forest
+    logger.info("Training Random Forest...")
+
+    best_rf = RandomForestClassifier(
+        n_estimators=100,
+        max_depth=10,
+        min_samples_split=2,
+        random_state=42,
+        n_jobs=2
+    )
+
+    best_rf.fit(X_train, y_train)
+
+    logger.info("Random Forest training completed.")
+
+    # 3. XGBoost
+    logger.info("Training XGBoost...")
+
+    best_xgb = xgb.XGBClassifier(
+        objective="multi:softprob",
+        learning_rate=0.1,
+        max_depth=5,
+        subsample=0.8,
+        n_estimators=100,
+        colsample_bytree=0.8,
+        eval_metric="mlogloss",
+        random_state=42,
+        n_jobs=2
+    )
+
+    best_xgb.fit(X_train, y_train)
+
+    logger.info("XGBoost training completed.")
     joblib.dump(lr, MODELS_DIR / "logistic_regression.pkl")
     joblib.dump(best_rf, MODELS_DIR / "random_forest.pkl")
     joblib.dump(best_xgb, MODELS_DIR / "xgboost.pkl")
