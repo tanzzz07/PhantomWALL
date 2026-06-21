@@ -198,8 +198,8 @@ jobs:
           fi
 
           # Upload backend/ to HF Space root, deleting any remote files not present locally.
-          # huggingface-cli handles Xet binary storage (pkl, png, etc.) transparently.
-          huggingface-cli upload "$HF_SPACE_NAME" backend/ . \
+          # hf CLI handles Xet binary storage (pkl, png, etc.) transparently.
+          hf upload "$HF_SPACE_NAME" backend/ . \
             --repo-type=space \
             --token="$HF_TOKEN" \
             --delete="*" \
