@@ -178,16 +178,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install Hugging Face Xet storage extension
-        run: pip install huggingface_hub[hf_xet]
+      - name: Install Hugging Face CLI
+        run: pip install -U "huggingface_hub[cli,hf_xet]"
 
       - name: Deploy to Hugging Face Spaces
         env:
@@ -199,48 +197,12 @@ jobs:
             exit 0
           fi
 
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions"
+          # Upload backend/ to HF Space root, deleting any remote files not present locally.
+          # huggingface-cli handles Xet binary storage (pkl, png, etc.) transparently.
+          huggingface-cli upload "$HF_SPACE_NAME" backend/ . \
+            --repo-type=space \
+            --token="$HF_TOKEN" \
+            --delete="*" \
+            --commit-message="Deploy from GitHub Actions (Commit: ${{ github.sha }})"
 
-          # Clone with retry logic to handle rate-limiting (HTTP 429) from Hugging Face Hub
-          CLONED=false
-          for i in {1..5}; do
-            echo "Attempt $i to clone Hugging Face Space..."
-            if git clone https://x-access-token:$HF_TOKEN@huggingface.co/spaces/$HF_SPACE_NAME hf_space; then
-              CLONED=true
-              break
-            else
-              echo "Clone failed. Retrying in 15 seconds..."
-              sleep 15
-            fi
-          done
-
-          if [ "$CLONED" = "false" ]; then
-            echo "Error: Failed to clone Hugging Face Space after 5 attempts."
-            exit 1
-          fi
-
-          # Clear out existing files in space repository clone except for .git folder
-          find hf_space -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
-
-          # Copy backend files to the space root directory
-          cp -r backend/* hf_space/
-
-          cd hf_space
-
-          # Ensure .gitattributes tracks binary files with xet filter (required by HF Spaces)
-          if ! grep -q "*.pkl" .gitattributes 2>/dev/null; then
-            echo "*.pkl filter=xet diff=xet merge=xet -text" >> .gitattributes
-            echo "*.png filter=xet diff=xet merge=xet -text" >> .gitattributes
-            echo "*.jpg filter=xet diff=xet merge=xet -text" >> .gitattributes
-            echo "*.bin filter=xet diff=xet merge=xet -text" >> .gitattributes
-          fi
-
-          git add -A
-          if git diff-index --quiet HEAD --; then
-            echo "No changes detected. Skipping commit."
-          else
-            git commit -m "Deploy from GitHub Actions (Commit: ${{ github.sha }})"
-            git push -f origin main
-          fi
-
+          echo "Successfully deployed to Hugging Face Space: $HF_SPACE_NAME"
