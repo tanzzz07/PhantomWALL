@@ -181,6 +181,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Hugging Face Xet storage extension
+        run: pip install huggingface_hub[hf_xet]
+
       - name: Deploy to Hugging Face Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -219,6 +227,15 @@ jobs:
           cp -r backend/* hf_space/
 
           cd hf_space
+
+          # Ensure .gitattributes tracks binary files with xet filter (required by HF Spaces)
+          if ! grep -q "*.pkl" .gitattributes 2>/dev/null; then
+            echo "*.pkl filter=xet diff=xet merge=xet -text" >> .gitattributes
+            echo "*.png filter=xet diff=xet merge=xet -text" >> .gitattributes
+            echo "*.jpg filter=xet diff=xet merge=xet -text" >> .gitattributes
+            echo "*.bin filter=xet diff=xet merge=xet -text" >> .gitattributes
+          fi
+
           git add -A
           if git diff-index --quiet HEAD --; then
             echo "No changes detected. Skipping commit."
@@ -226,3 +243,4 @@ jobs:
             git commit -m "Deploy from GitHub Actions (Commit: ${{ github.sha }})"
             git push -f origin main
           fi
+
