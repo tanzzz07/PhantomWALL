@@ -10,16 +10,13 @@ from pathlib import Path
 # Resolve path for backend imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from app.core.config import get_settings
-from app.db import AsyncSessionFactory, engine
-from app.models.analytics import TrackerEventRecord
-from sqlalchemy import select
-
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 TELEMETRY_DIR = Path(__file__).resolve().parent.parent / "data" / "telemetry"
 PROCESSED_DIR = Path(__file__).resolve().parent.parent / "data" / "processed"
+
+IS_CI = os.environ.get("CI", "").lower() in ("true", "1", "yes")
 
 
 def ensure_dirs():
@@ -27,23 +24,36 @@ def ensure_dirs():
 
 
 async def fetch_db_telemetry() -> list[dict]:
-    """Fetch real telemetry from the PostgreSQL/SQLite tracker_events table."""
+    """Fetch real telemetry from the PostgreSQL/SQLite tracker_events table.
+
+    All heavy imports (SQLAlchemy engine, models) are deferred to this function
+    so they never execute in CI where no database is available.
+    """
     logger.info("Attempting to query telemetry from database...")
-    settings = get_settings()
+
+    # Lazy imports — only executed when this function is actually called
     try:
-        # Check database connection and schema
+        from app.core.config import get_settings
+        from app.db import AsyncSessionFactory
+        from app.models.analytics import TrackerEventRecord
+        from sqlalchemy import select
+    except Exception as e:
+        logger.warning(f"Failed to import database modules: {e}. Returning empty.")
+        return []
+
+    try:
         async with AsyncSessionFactory() as session:
             stmt = select(TrackerEventRecord).order_by(TrackerEventRecord.occurred_at.desc()).limit(10000)
             result = await session.execute(stmt)
             records = result.scalars().all()
-            
+
             if not records:
                 logger.info("No telemetry records found in database.")
                 return []
-                
+
             logger.info(f"Retrieved {len(records)} telemetry records from database.")
             telemetry_data = []
-            
+
             # Group events by (install_id, tracker_domain) to compute frequency manually
             freq_map = {}
             for r in records:
@@ -56,7 +66,7 @@ async def fetch_db_telemetry() -> list[dict]:
                 db_label = (r.classification or "safe").lower()
                 if db_label == "tracker":
                     db_label = "suspicious"
-                
+
                 telemetry_data.append({
                     "url": r.url,
                     "domain": r.tracker_domain,
@@ -77,14 +87,14 @@ def generate_synthetic_telemetry(intermediate_data: list) -> list[dict]:
     """Generate mock telemetry data with rich behavioral features for testing/training."""
     logger.info("Generating synthetic behavioral telemetry dataset from intermediate domains...")
     telemetry_data = []
-    
+
     request_types = ["script", "xmlhttprequest", "image", "sub_frame", "stylesheet", "other"]
-    
+
     for idx, item in enumerate(intermediate_data):
         domain = item["domain"]
         label = item["label"]
         base_url = item["url"]
-        
+
         # Determine realistic request frequency and behavioral features based on class
         if label == "safe":
             freq = random.randint(1, 4)
@@ -115,7 +125,7 @@ def generate_synthetic_telemetry(intermediate_data: list) -> list[dict]:
         # Generate timestamps over the last 24 hours
         time_offset = random.randint(0, 86400)
         timestamp = (datetime.now(timezone.utc) - timedelta(seconds=time_offset)).isoformat()
-        
+
         telemetry_data.append({
             "url": base_url,
             "domain": domain,
@@ -126,33 +136,38 @@ def generate_synthetic_telemetry(intermediate_data: list) -> list[dict]:
             "request_frequency": freq,
             "label": label
         })
-        
+
     return telemetry_data
 
 
 async def main():
     ensure_dirs()
-    
-    # 1. Try to query database telemetry
-    telemetry_data = await fetch_db_telemetry()
-    
-    # 2. If database lacks telemetry, fall back to synthetic generation
+
+    telemetry_data = []
+
+    # In CI, skip database entirely — no engine creation, no connection pool, no hang
+    if IS_CI:
+        logger.info("CI environment detected. Skipping database telemetry query.")
+    else:
+        telemetry_data = await fetch_db_telemetry()
+
+    # If database lacks telemetry (or CI mode), fall back to synthetic generation
     if not telemetry_data:
         intermediate_path = PROCESSED_DIR / "intermediate_domains.json"
         if not intermediate_path.exists():
             logger.error("Intermediate domains JSON not found. Run collector.py first.")
             sys.exit(1)
-            
+
         with open(intermediate_path, "r", encoding="utf-8") as f:
             intermediate_data = json.load(f)
-            
+
         telemetry_data = generate_synthetic_telemetry(intermediate_data)
-        
+
     # Write output to telemetry directory
     output_path = TELEMETRY_DIR / "telemetry_events.json"
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(telemetry_data, f, indent=2)
-        
+
     logger.info(f"Saved {len(telemetry_data)} telemetry samples to {output_path}")
 
 

@@ -76,15 +76,13 @@ def run_evaluation():
     logger.info("Evaluating trained models...")
     
     # Load test split
-    split_path = MODELS_DIR / "train_test_split.json"
+    split_path = MODELS_DIR / "train_test_split.pkl"
     if not split_path.exists():
         logger.error(f"Train/test split not found at {split_path}. Run trainer.py first.")
         return
         
-    with open(split_path, "r", encoding="utf-8") as f:
-        split_data = json.load(f)
-        
-    X_test = pd.DataFrame(split_data["X_test"])
+    split_data = joblib.load(split_path)
+    X_test = split_data["X_test"]
     y_test = np.array(split_data["y_test"])
     
     # Load label encoder to get names

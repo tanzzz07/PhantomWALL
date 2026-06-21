@@ -87,7 +87,8 @@ def train_models():
     logger.info("Training Logistic Regression...")
 
     lr = LogisticRegression(
-        max_iter=3000,
+        solver="lbfgs",
+        max_iter=500,
         random_state=42
     )
 
@@ -130,15 +131,15 @@ def train_models():
     joblib.dump(best_rf, MODELS_DIR / "random_forest.pkl")
     joblib.dump(best_xgb, MODELS_DIR / "xgboost.pkl")
     
-    # Save train/test datasets for evaluation script
+    # Save train/test split using joblib (fast binary, ~10x faster than JSON for DataFrames)
     train_test_data = {
-        "X_train": X_train.to_dict(),
-        "X_test": X_test.to_dict(),
-        "y_train": y_train.tolist(),
-        "y_test": y_test.tolist()
+        "X_train": X_train,
+        "X_test": X_test,
+        "y_train": y_train,
+        "y_test": y_test
     }
-    with open(MODELS_DIR / "train_test_split.json", "w", encoding="utf-8") as f:
-        json.dump(train_test_data, f)
+    joblib.dump(train_test_data, MODELS_DIR / "train_test_split.pkl")
+    logger.info("Saved train/test split to train_test_split.pkl")
         
     logger.info("Models trained and exported successfully!")
 

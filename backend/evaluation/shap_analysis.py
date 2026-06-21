@@ -98,13 +98,12 @@ def run_shap_analysis():
         feature_names = json.load(f)
         
     # 3. Load dataset samples to use as background data
-    split_path = MODELS_DIR / "train_test_split.json"
+    split_path = MODELS_DIR / "train_test_split.pkl"
     if not split_path.exists():
         logger.error(f"Train/test split not found at {split_path}.")
         return
-    with open(split_path, "r", encoding="utf-8") as f:
-        split_data = json.load(f)
-    X_test = pd.DataFrame(split_data["X_test"])[feature_names]
+    split_data = joblib.load(split_path)
+    X_test = split_data["X_test"][feature_names]
     
     # 4. Try to import and run SHAP
     try:
